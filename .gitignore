@@ -8,9 +8,14 @@ Thumbs.db
 *.swp
 *.swo
 
-# Build artifacts
+# Dependencies
 node_modules/
 vendor/
+
+# Build artifacts (committed for WP plugin deploys)
+# build/ is intentionally NOT ignored
+
+# Distribution
 *.zip
 
 # Logs

@@ -4,7 +4,10 @@
  * Description: Replaces the default WordPress dashboard welcome panel with a Beaver Builder template, selectable per user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
- * Version: 0.1.0
+ * Version: 0.2.0
+ * Requires at least: 5.0
+ * Tested up to: 6.8
+ * Requires PHP: 7.4
  * License: GNU General Public License v2.0
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: bb-custom-admin
@@ -15,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '0.1.0' );
+define( 'BBCA_VER', '0.2.0' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );
@@ -31,9 +34,10 @@ define( 'BBCA_LEGACY_OPTION', 'bbpd_template' );
  * Activation hook: migrate legacy settings and deactivate the old plugin.
  *
  * @since 0.1.0
+ * @package OneDog\BBCustomAdmin
  * @return void
  */
-function bbca_activate() {
+function onedog_bbca_activate() {
 	// Migrate legacy option if it exists and the new one does not.
 	$legacy = get_option( BBCA_LEGACY_OPTION );
 	$new    = get_option( 'onedog_bbca_template' );
@@ -48,6 +52,72 @@ function bbca_activate() {
 		deactivate_plugins( BBCA_LEGACY_PLUGIN );
 	}
 }
-register_activation_hook( __FILE__, 'bbca_activate' );
+register_activation_hook( __FILE__, 'onedog_bbca_activate' );
 
+/**
+ * Registers the settings admin page under Settings menu.
+ *
+ * @since 0.2.0
+ * @return void
+ */
+function onedog_bbca_admin_menu() {
+	add_options_page(
+		__( 'Custom Admin', 'bb-custom-admin' ),
+		__( 'Custom Admin', 'bb-custom-admin' ),
+		'manage_options',
+		'onedog-bbca-settings',
+		'onedog_bbca_render_settings_page'
+	);
+}
+add_action( 'admin_menu', 'onedog_bbca_admin_menu' );
+
+/**
+ * Renders the settings page root element for React.
+ *
+ * @since 0.2.0
+ * @return void
+ */
+function onedog_bbca_render_settings_page() {
+	echo '<div id="onedog-bbca-settings-root"></div>';
+}
+
+/**
+ * Enqueues settings page assets (React app + styles).
+ *
+ * @since 0.2.0
+ * @param string $hook_suffix The current admin page hook suffix.
+ * @return void
+ */
+function onedog_bbca_enqueue_settings_assets( $hook_suffix ) {
+	if ( 'settings_page_onedog-bbca-settings' !== $hook_suffix ) {
+		return;
+	}
+
+	$asset_file = BBCA_DIR . 'build/settings.asset.php';
+
+	if ( ! file_exists( $asset_file ) ) {
+		return;
+	}
+
+	$asset = require $asset_file;
+
+	wp_enqueue_script(
+		'onedog-bbca-settings',
+		BBCA_URL . 'build/settings.js',
+		$asset['dependencies'],
+		$asset['version'],
+		true
+	);
+
+	wp_enqueue_style(
+		'onedog-bbca-settings',
+		BBCA_URL . 'assets/css/admin.css',
+		[ 'wp-components' ],
+		BBCA_VER
+	);
+}
+add_action( 'admin_enqueue_scripts', 'onedog_bbca_enqueue_settings_assets' );
+
+// Load plugin classes.
 require_once BBCA_DIR . 'classes/class-onedog-bb-custom-admin.php';
+require_once BBCA_DIR . 'classes/class-onedog-bb-rest.php';

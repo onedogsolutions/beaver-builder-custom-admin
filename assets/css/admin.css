@@ -1,24 +1,35 @@
 /**
- * Beaver Builder Custom Admin — Settings Styles
+ * Beaver Builder Custom Admin — Settings Page Styles
  *
  * @since 0.1.0
  * @package OneDog\BBCustomAdmin
  */
 
-#onedog-bbca-settings-form {
-	margin-top: 13px;
-	-webkit-user-select: none;
-	user-select: none;
+.onedog-bbca-settings {
+	max-width: 800px;
 }
 
-#onedog-bbca-settings-form .onedog-bbca-settings-table {
-	max-width: 500px;
+.onedog-bbca-settings .components-panel {
+	margin-top: 16px;
 }
 
-#onedog-bbca-settings-form .onedog-bbca-settings-table td {
-	vertical-align: middle;
+.onedog-bbca-settings .onedog-bbca-role-select {
+	max-width: 400px;
+	margin-bottom: 12px;
 }
 
-#onedog-bbca-settings-form .onedog-bbca-settings-table .onedog-bbca-input {
-	width: 100%;
+.onedog-bbca-settings .components-notice {
+	margin: 12px 0;
+}
+
+.onedog-bbca-loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 24px 0;
+}
+
+.onedog-bbca-loading p {
+	margin: 0;
+	color: #646970;
 }

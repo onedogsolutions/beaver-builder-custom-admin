@@ -1,0 +1,38 @@
+/**
+ * Beaver Builder Custom Admin — Dashboard Panel Styles
+ *
+ * @since 0.2.0
+ * @package OneDog\BBCustomAdmin
+ */
+
+.welcome-panel {
+	padding: 0;
+}
+
+.welcome-panel .welcome-panel-close {
+	z-index: 1;
+}
+
+#onedog-bbca-panel {
+	-webkit-font-smoothing: antialiased;
+}
+
+#onedog-bbca-panel .fl-builder-content ul,
+#onedog-bbca-panel .fl-builder-content ol {
+	list-style: inherit;
+}
+
+#onedog-bbca-panel .fl-builder-content p {
+	color: inherit;
+	font-size: inherit;
+	margin: inherit;
+	margin-bottom: 10px;
+}
+
+#onedog-bbca-panel input:focus,
+#onedog-bbca-panel textarea:focus,
+#onedog-bbca-panel select:focus,
+#onedog-bbca-panel button:focus {
+	-webkit-box-shadow: none;
+	box-shadow: none;
+}

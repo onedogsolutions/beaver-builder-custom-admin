@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard, welcome panel, admin, custom
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,32 +19,63 @@ Display a different template for each user role.
 **How it works:**
 
 1. Create a layout with Beaver Builder.
-2. Go to Beaver Builder Settings → Custom Admin and select the layout for any user role.
+2. Go to Settings → Custom Admin and select the layout for any user role.
 3. Save. Done!
 
 **Migration:** This plugin replaces "Dashboard Welcome for Beaver Builder" (bb-dashboard-welcome). On activation it automatically migrates your existing settings and deactivates the legacy plugin.
+
+**Disclaimer:** This is an independent plugin and is not affiliated with, endorsed by, or sponsored by Beaver Builder or FastLine Media. "Beaver Builder" is a trademark of FastLine Media, Inc.
 
 == Installation ==
 
 1. Install Beaver Builder Custom Admin either via the WordPress plugin directory or by uploading the files to `/wp-content/plugins/`.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. If the legacy "Dashboard Welcome for Beaver Builder" plugin is active, it will be deactivated automatically and its settings migrated.
+4. Navigate to Settings → Custom Admin to configure your dashboard panels.
 
 == Requirements ==
 
-* Beaver Builder plugin (active) for layout rendering and the settings panel.
+* Beaver Builder plugin (active) for layout rendering on the dashboard.
+* WordPress 5.0+ (uses the REST API and React-based admin UI).
 
 == Frequently Asked Questions ==
 
 = Do I need coding experience? =
 
-No. All configuration is done through the Beaver Builder settings panel.
+No. All configuration is done through the Settings → Custom Admin page.
 
 = What happens to my old settings? =
 
 On activation, settings from "Dashboard Welcome for Beaver Builder" are migrated automatically. The old plugin is deactivated.
 
+= Does this work without Beaver Builder? =
+
+The settings page will load, but no layouts will be available. Beaver Builder must be active for layout rendering on the dashboard.
+
+== Privacy ==
+
+This plugin:
+
+* Stores a role-to-template mapping in the WordPress options table (`onedog_bbca_template`).
+* Does not collect, transmit, or store any personal data.
+* Does not set cookies.
+* Does not make external HTTP requests.
+* Does not track users or log activity.
+
+All data remains local to your WordPress installation.
+
 == Changelog ==
+
+= 0.2.0 =
+* React-based settings page (Settings → Custom Admin) using WordPress components.
+* REST API endpoints for layout retrieval and settings management.
+* Transient caching for BB layout queries (12h TTL, auto-flush on template save).
+* Modern vanilla JS for dashboard panel (no jQuery dependency).
+* All CSS/JS properly enqueued from files (no inline blocks).
+* Security: file_exists() guards on includes, suppress_filters on queries.
+* Added Requires at least, Tested up to, Requires PHP headers.
+* Accessible form controls with proper labels via React SelectControl.
+* Removed dependency on FLBuilderAdminSettings for the settings UI.
 
 = 0.1.0 =
 * Initial release under the OneDog namespace.
@@ -54,6 +85,9 @@ On activation, settings from "Dashboard Welcome for Beaver Builder" are migrated
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 0.2.0 =
+Major update: new React settings UI, REST API, performance caching, and full audit remediation. Settings moved from BB panel to Settings → Custom Admin.
 
 = 0.1.0 =
 Initial release. Replaces "Dashboard Welcome for Beaver Builder" with automatic settings migration.

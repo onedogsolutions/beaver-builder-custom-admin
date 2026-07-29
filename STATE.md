@@ -2,72 +2,119 @@
 
 ## Release state
 
-**`main` is at v0.1.0** (commit `dcf6f5e`) as of Phase 1, the initial refactor from the upstream source. No prior releases exist; this is the first versioned state of the plugin under the OneDog namespace. Committed 2026-07-28.
+**`main` is at v0.2.0** as of Phase 2, the React/audit remediation release. It was at v0.1.0 (commit `9d2a69a`) immediately before. Phase 2 adds the React settings UI, REST API, transient caching, vanilla JS dashboard panel, and resolves all 14 legitimate Plugin Auditor findings.
 
-## Current Phase: Phase 1 (clone, namespace refactor, and modernization)
+## Current Phase: Phase 2 (React settings UI, audit remediation, JS modernization)
 
-### Phase 1 Modifications (v0.1.0)
+### Phase 2 Modifications (v0.2.0)
 
-Forked from [helloideabox/beaver-builder-dashboard-welcome](https://github.com/helloideabox/beaver-builder-dashboard-welcome) (v1.0.0, December 2016). The upstream plugin replaces the default WordPress dashboard welcome panel with a Beaver Builder layout, selectable per user role. It has not been updated since initial release and carries several outdated patterns.
+Plugin Auditor scan reported 39 findings across 9 categories. After triage, 14 were legitimate and 25 were false positives (pattern-matching on code that does not exist in this plugin — `eval()`, `unserialize()`, remote requests, etc.).
 
-**Namespace refactor — all identifiers moved to the OneDog namespace.**
+**Architecture change — settings UI moved from BB's PHP panel to a standalone React app.**
 
-| Old | New |
-|-----|-----|
-| Plugin name: *Dashboard Welcome for Beaver Builder* | *Beaver Builder Custom Admin* |
-| Main file: `bb-dashboard-welcome.php` | `beaver-builder-custom-admin.php` |
-| Text domain: `bbpd` | `bb-custom-admin` |
-| Constants: `DWBB_VER`, `DWBB_DIR`, `DWBB_URL`, `DWBB_PATH` | `BBCA_VER`, `BBCA_DIR`, `BBCA_URL`, `BBCA_PATH` |
-| Class: `BB_Power_Dashboard_Admin` | `OneDog_BB_Custom_Admin` |
-| Class file: `classes/class-dw-admin.php` | `classes/class-onedog-bb-custom-admin.php` |
-| Option: `bbpd_template` | `onedog_bbca_template` |
-| Nonce: `bbpd-settings` / `bbpd-settings-nonce` | `onedog-bbca-settings` / `onedog-bbca-settings-nonce` |
-| CSS/HTML prefix: `bbpd-*`, `bb-dashboard-welcome` | `onedog-bbca-*`, `onedog-bbca-panel` |
-| Author: *Beaver Addons, Achal Jain / IdeaBox Creations* | *Ryan Waterbury, One Dog Solutions* |
+The v0.1.0 settings form was rendered inside Beaver Builder's admin settings panel via `fl_builder_admin_settings_nav_items` / `fl_builder_admin_settings_render_forms` hooks. This created a hard dependency on `FLBuilderAdminSettings::render_form_action()` and mixed PHP template rendering with BB internals.
 
-**Security hardening — the 2016 code had no input sanitization or output escaping.**
+v0.2.0 replaces this with:
+- A dedicated admin page at **Settings → Custom Admin** (`add_options_page`)
+- A React app (`src/settings/`) using `@wordpress/element`, `@wordpress/components`, `@wordpress/api-fetch`
+- REST endpoints (`onedog-bbca/v1`) for layout retrieval and settings persistence
+- Build via `@wordpress/scripts` (webpack, outputs to `build/`)
 
-- Added `defined( 'ABSPATH' ) || exit;` guard to every PHP file. The upstream had none; any file could be loaded directly.
-- `save_settings()` now sanitizes each value in the `$_POST` template array with `sanitize_text_field()` before writing to the database. Upstream wrote raw `$_POST` directly to `update_option()`.
-- `$_GET['page']` comparison in `load_scripts()` now uses a strict `===` check. Upstream used loose `==`.
-- All dynamic output in `admin-settings.php` and `welcome-panel.php` wrapped in `esc_html()`, `esc_attr()`, or `esc_url()` as appropriate. Upstream echoed `$value`, `$template['name']`, and `$template['slug']` unescaped.
-- Nonce verification retained but renamed; early return on failure was already present.
+BB is still required for layout *rendering* on the dashboard (`do_shortcode`), but no longer for the settings *UI*.
 
-**Modernization — outdated patterns corrected.**
+**REST API — `classes/class-onedog-bb-rest.php`.**
 
-- Asset versioning: replaced `rand()` with `BBCA_VER` constant for CSS cache-busting. Upstream used `rand()`, which defeats browser caching entirely and generates a new version string on every page load.
-- Replaced `array_shift( $user->roles )` with `array_values( $user->roles )[0]` — `array_shift()` requires a variable reference and modifies the array in place; on a property fetch this triggers a notice in PHP 8.x.
-- Short array syntax `[]` throughout, replacing `array()`.
-- Added `FLBuilder` class-existence guard before calling `FLBuilder::register_layout_styles_scripts` to prevent a fatal on sites where BB is deactivated but the plugin remains active.
-- `welcome-panel.php` shortcode output now passed through `do_shortcode()` with the slug escaped via `esc_attr()`.
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/onedog-bbca/v1/layouts` | GET | Returns BB layout templates + user roles + BB active status |
+| `/onedog-bbca/v1/settings` | GET | Returns current role-to-template mapping |
+| `/onedog-bbca/v1/settings` | POST | Saves sanitized role-to-template mapping |
 
-**Structure — target layout:**
+All routes require `manage_options` capability. POST validates input is an array of strings.
+
+**Performance — transient caching for layout queries.**
+
+`get_posts()` for BB templates is now cached in a transient (`onedog_bbca_templates`, 12h TTL). Cache is flushed on `save_post_fl-builder-template` and `deleted_post` (when post type matches). Query args include `suppress_filters => true` and `no_found_rows => true` (audit finding S3/P1).
+
+**Security — audit findings resolved.**
+
+- S6 (unsafe file inclusion): `file_exists()` guard before `include` in `welcome_panel()`.
+- S8 (XSS via get_selected): Method removed entirely; React escapes by default.
+- S3 (get_posts): `suppress_filters`, `no_found_rows` added; no user input reaches query.
+
+**Standards — inline assets eliminated.**
+
+- ST5/ST16/ST17: Inline `<style>` and `<script>` blocks removed from `welcome-panel.php`. Styles moved to `assets/css/frontend.css`, script to `assets/js/frontend.js`. Both enqueued conditionally on `index.php` only when the panel is active.
+- ST9: `@package` added to all DocBlocks.
+- ST11: Activation function renamed to `onedog_bbca_activate()`.
+- ST13: Resolved by React (no PHP-rendered select attributes).
+
+**Compatibility — jQuery removed.**
+
+- C1: Dashboard panel script is now vanilla ES2020+ (`Element.before()`). No jQuery dependency. Loaded with `defer` strategy.
+- C2: `Requires at least: 5.0` and `Tested up to: 6.8` added to plugin header.
+- C3: `Requires PHP: 7.4` added to plugin header.
+
+**Privacy & Accessibility.**
+
+- PV1: Privacy section added to readme.txt (no data collection, no cookies, no external requests).
+- A1: React `SelectControl` provides accessible labels natively (role name is the label).
+
+**Plugin Review.**
+
+- PR2: Non-affiliation disclaimer added to readme.txt.
+
+**Removed:**
+- `includes/admin-settings.php` (replaced by React app)
+- `bb_nav_items()`, `bb_nav_forms()`, `save_settings()`, `get_selected()`, `get_bb_templates()` from core class
+- All `fl_builder_admin_settings_*` hooks
+- jQuery dependency for dashboard panel
+
+**Added:**
+- `classes/class-onedog-bb-rest.php` — REST controller
+- `src/settings/index.js` — React entry point
+- `src/settings/app.js` — SettingsApp component
+- `assets/js/frontend.js` — vanilla JS panel repositioning
+- `assets/css/frontend.css` — dashboard panel styles
+- `webpack.config.js` — custom entry point for wp-scripts
+- `package.json` — build tooling
+
+**Target structure (v0.2.0):**
 
 ```
 beaver-builder-custom-admin/
 ├── assets/
-│   └── css/
-│       └── admin.css
+│   ├── css/
+│   │   ├── admin.css
+│   │   └── frontend.css
+│   └── js/
+│       └── frontend.js
+├── build/
+│   ├── settings.js
+│   └── settings.asset.php
 ├── classes/
-│   └── class-onedog-bb-custom-admin.php
+│   ├── class-onedog-bb-custom-admin.php
+│   └── class-onedog-bb-rest.php
 ├── includes/
-│   ├── admin-settings.php
 │   └── welcome-panel.php
+├── src/
+│   └── settings/
+│       ├── index.js
+│       └── app.js
 ├── beaver-builder-custom-admin.php
+├── package.json
+├── webpack.config.js
 ├── readme.txt
-├── LICENSE (GPL-2.0)
+├── LICENSE
 ├── .gitignore
 └── STATE.md
 ```
 
-**Known limitations carried forward from upstream (not addressed in Phase 1):**
+## Historical Phase: Phase 1 (clone, namespace refactor, and modernization)
 
-- Static-class architecture retained. This matches Beaver Builder ecosystem conventions and is not a defect, but a future phase could introduce instance-based loading if the plugin grows.
-- The plugin depends on `FLBuilderAdminSettings::render_form_action()` for its settings form action URL. If Beaver Builder removes or renames this method in a future release, the settings form will break. A fallback (`admin_url( 'options-general.php?page=fl-builder-settings' )`) should be added if that occurs.
-- Only the first role in a multi-role user's role array is considered (`array_values( $user->roles )[0]`). WordPress assigns roles in insertion order, so this is typically the highest-priority role, but it is not guaranteed. Upstream had the same limitation.
-- No uninstall routine. The `onedog_bbca_template` option is not cleaned up on plugin deletion. Candidate for a future phase.
+### Phase 1 Modifications (v0.1.0)
 
-**Not changed:** core behaviour is identical to upstream — the plugin still hooks `welcome_panel`, removes `wp_welcome_panel`, and renders a Beaver Builder layout via `do_shortcode('[fl_builder_insert_layout slug="..."]')`. The per-role template selection UI still lives inside Beaver Builder's own settings panel under a custom tab.
+Forked from [helloideabox/beaver-builder-dashboard-welcome](https://github.com/helloideabox/beaver-builder-dashboard-welcome) (v1.0.0, December 2016). Refactored all identifiers to the OneDog namespace, added security hardening (ABSPATH guards, input sanitization, output escaping), PHP 8.x compatibility fixes, and automatic migration from the legacy plugin on activation.
 
 ## Project Conventions
 
@@ -76,4 +123,6 @@ beaver-builder-custom-admin/
 - **Text domain:** `bb-custom-admin` for all translatable strings.
 - **Author:** Ryan Waterbury, One Dog Solutions — https://onedog.solutions/
 - **License:** GPL-2.0, matching upstream and WordPress core.
-- **No build step:** the plugin is plain PHP + one CSS file. No Composer, no npm.
+- **Build:** `@wordpress/scripts` (webpack). `build/` is committed; `node_modules/` is not.
+- **JS:** React via WordPress packages for admin UI; vanilla ES2020+ for frontend. No jQuery.
+- **REST namespace:** `onedog-bbca/v1`.
