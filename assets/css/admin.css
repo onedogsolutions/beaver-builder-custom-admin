@@ -1,0 +1,24 @@
+/**
+ * Beaver Builder Custom Admin — Settings Styles
+ *
+ * @since 0.1.0
+ * @package OneDog\BBCustomAdmin
+ */
+
+#onedog-bbca-settings-form {
+	margin-top: 13px;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+#onedog-bbca-settings-form .onedog-bbca-settings-table {
+	max-width: 500px;
+}
+
+#onedog-bbca-settings-form .onedog-bbca-settings-table td {
+	vertical-align: middle;
+}
+
+#onedog-bbca-settings-form .onedog-bbca-settings-table .onedog-bbca-input {
+	width: 100%;
+}
