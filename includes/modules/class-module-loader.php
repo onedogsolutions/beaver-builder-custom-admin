@@ -52,6 +52,7 @@ final class OneDog_BBCA_Module_Loader {
 	 */
 	private static function register_defaults() {
 		self::$registry = [
+			'role-editor'      => BBCA_DIR . 'includes/modules/class-role-editor.php',
 			'welcome-screen'   => BBCA_DIR . 'includes/modules/class-welcome-screen.php',
 			'menu-visibility'  => BBCA_DIR . 'includes/modules/class-menu-visibility.php',
 			'notice-cleaner'   => BBCA_DIR . 'includes/modules/class-notice-cleaner.php',
@@ -102,6 +103,10 @@ final class OneDog_BBCA_Module_Loader {
 		$enabled = self::get_enabled_modules();
 
 		$meta = [
+			'role-editor'     => [
+				'label'       => __( 'Role & Capability Editor', 'bb-custom-admin' ),
+				'description' => __( 'Manage WordPress roles and capabilities with rollback support.', 'bb-custom-admin' ),
+			],
 			'welcome-screen'  => [
 				'label'       => __( 'Dashboard Welcome Templates', 'bb-custom-admin' ),
 				'description' => __( 'Assign Beaver Builder layouts as the dashboard welcome panel per user role.', 'bb-custom-admin' ),

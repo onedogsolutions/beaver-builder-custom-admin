@@ -46,6 +46,9 @@ final class OneDog_BBCA_Menu_Visibility {
 		// Late priority so all menus are registered before we remove them.
 		add_action( 'admin_menu', [ __CLASS__, 'remove_menus' ], 9999 );
 		add_action( 'wp_before_admin_bar_render', [ __CLASS__, 'remove_toolbar_nodes' ], 9999 );
+
+		// Block direct URL access to restricted pages.
+		add_action( 'admin_init', [ __CLASS__, 'block_direct_access' ], 9999 );
 	}
 
 	/**
@@ -102,6 +105,86 @@ final class OneDog_BBCA_Menu_Visibility {
 		foreach ( $rules[ $role ] as $node_id ) {
 			$wp_admin_bar->remove_node( sanitize_text_field( $node_id ) );
 		}
+	}
+
+	/**
+	 * Blocks direct URL access to restricted admin pages.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public static function block_direct_access() {
+		// Administrators bypass restrictions.
+		if ( current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$role  = self::get_current_role();
+		$rules = get_option( self::MENU_OPTION, [] );
+
+		if ( ! is_array( $rules ) || ! isset( $rules[ $role ] ) || ! is_array( $rules[ $role ] ) ) {
+			return;
+		}
+
+		$hidden = $rules[ $role ];
+
+		// Get current page.
+		$pagenow = $GLOBALS['pagenow'] ?? '';
+
+		// Check top-level menu pages.
+		foreach ( $hidden as $item ) {
+			$item = sanitize_text_field( $item );
+
+			// Skip submenu items for direct access check.
+			if ( str_starts_with( $item, 'submenu:' ) ) {
+				$path  = substr( $item, 8 );
+				$parts = explode( '>', $path, 2 );
+
+				if ( 2 === count( $parts ) ) {
+					$submenu_slug = $parts[1];
+
+					// Check if current page matches submenu slug.
+					if ( self::is_current_page( $submenu_slug ) ) {
+						wp_die( esc_html__( 'You are not allowed to access this page.', 'bb-custom-admin' ) );
+					}
+				}
+			} else {
+				// Top-level menu page.
+				if ( self::is_current_page( $item ) ) {
+					wp_die( esc_html__( 'You are not allowed to access this page.', 'bb-custom-admin' ) );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Checks if the current admin page matches a menu slug.
+	 *
+	 * @since 1.0.0
+	 * @param string $slug Menu slug.
+	 * @return bool
+	 */
+	private static function is_current_page( $slug ) {
+		global $plugin_page;
+
+		$pagenow = $GLOBALS['pagenow'] ?? '';
+
+		// Direct match with pagenow.
+		if ( $pagenow === $slug ) {
+			return true;
+		}
+
+		// Check plugin_page for custom menu pages.
+		if ( isset( $plugin_page ) && $plugin_page === $slug ) {
+			return true;
+		}
+
+		// Check $_GET['page'] for submenu pages.
+		if ( isset( $_GET['page'] ) && sanitize_text_field( wp_unslash( $_GET['page'] ) ) === $slug ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '0.3.0' );
+define( 'BBCA_VER', '1.0.0' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );
@@ -90,7 +90,7 @@ function onedog_bbca_enqueue_settings_assets( $hook_suffix ) {
 		return;
 	}
 
-	$asset_file = BBCA_DIR . 'build/settings.asset.php';
+	$asset_file = BBCA_DIR . 'build/index.asset.php';
 
 	if ( ! file_exists( $asset_file ) ) {
 		return;
@@ -100,17 +100,28 @@ function onedog_bbca_enqueue_settings_assets( $hook_suffix ) {
 
 	wp_enqueue_script(
 		'onedog-bbca-settings',
-		BBCA_URL . 'build/settings.js',
+		BBCA_URL . 'build/index.js',
 		$asset['dependencies'],
 		$asset['version'],
 		true
 	);
 
+	// Localize script with settings data.
+	wp_localize_script(
+		'onedog-bbca-settings',
+		'bbcaSettings',
+		[
+			'nonce'    => wp_create_nonce( 'wp_rest' ),
+			'restUrl'  => esc_url_raw( rest_url() ),
+			'version'  => BBCA_VER,
+		]
+	);
+
 	wp_enqueue_style(
 		'onedog-bbca-settings',
-		BBCA_URL . 'assets/css/admin.css',
-		[ 'wp-components' ],
-		BBCA_VER
+		BBCA_URL . 'build/index.css',
+		[],
+		$asset['version']
 	);
 }
 add_action( 'admin_enqueue_scripts', 'onedog_bbca_enqueue_settings_assets' );

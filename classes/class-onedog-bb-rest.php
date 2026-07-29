@@ -99,6 +99,69 @@ final class OneDog_BB_REST {
 				'permission_callback' => [ __CLASS__, 'check_permission' ],
 			],
 		] );
+
+		// Role Editor endpoints.
+		register_rest_route( self::NAMESPACE, '/roles', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ __CLASS__, 'get_roles' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ __CLASS__, 'add_role' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/roles/(?P<role>[a-z0-9_]+)', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ __CLASS__, 'get_role_capabilities' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ __CLASS__, 'save_role_capabilities' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+			[
+				'methods'             => 'DELETE',
+				'callback'            => [ __CLASS__, 'delete_role' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/roles/(?P<role>[a-z0-9_]+)/clear', [
+			'methods'             => 'POST',
+			'callback'            => [ __CLASS__, 'clear_role_capabilities' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/roles/(?P<role>[a-z0-9_]+)/rollback', [
+			'methods'             => 'POST',
+			'callback'            => [ __CLASS__, 'rollback_role' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/roles/(?P<role>[a-z0-9_]+)/rename', [
+			'methods'             => 'POST',
+			'callback'            => [ __CLASS__, 'rename_role' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
+
+		// Import / Export.
+		register_rest_route( self::NAMESPACE, '/export', [
+			'methods'             => 'GET',
+			'callback'            => [ __CLASS__, 'export_config' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/import', [
+			'methods'             => 'POST',
+			'callback'            => [ __CLASS__, 'import_config' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
 	}
 
 	/**
@@ -321,6 +384,223 @@ final class OneDog_BB_REST {
 		if ( 'fl-builder-template' === get_post_type( $post_id ) ) {
 			self::flush_cache();
 		}
+	}
+
+	/*
+	|--------------------------------------------------------------------------
+	| Role Editor Endpoints
+	|--------------------------------------------------------------------------
+	*/
+
+	public static function get_roles() {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		return rest_ensure_response( [ 'roles' => OneDog_BBCA_Role_Editor::get_roles() ] );
+	}
+
+	public static function get_role_capabilities( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		$role = sanitize_key( $request->get_param( 'role' ) );
+		return rest_ensure_response( [ 'capabilities' => OneDog_BBCA_Role_Editor::get_role_capabilities( $role ) ] );
+	}
+
+	public static function save_role_capabilities( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		$role = sanitize_key( $request->get_param( 'role' ) );
+		$caps = $request->get_param( 'capabilities' );
+
+		if ( ! is_array( $caps ) ) {
+			return new WP_Error( 'invalid_data', __( 'Capabilities must be an array.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$result = OneDog_BBCA_Role_Editor::save_role_capabilities( $role, $caps );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( [ 'success' => true ] );
+	}
+
+	public static function clear_role_capabilities( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		$role = sanitize_key( $request->get_param( 'role' ) );
+		$result = OneDog_BBCA_Role_Editor::clear_role_capabilities( $role );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( [ 'success' => true ] );
+	}
+
+	public static function rollback_role( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		$role = sanitize_key( $request->get_param( 'role' ) );
+		$result = OneDog_BBCA_Role_Editor::rollback_role( $role );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( [ 'success' => true, 'capabilities' => $result ] );
+	}
+
+	public static function add_role( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		$name = sanitize_text_field( $request->get_param( 'name' ) );
+		$slug = sanitize_key( $request->get_param( 'slug' ) ?? '' );
+		$clone = sanitize_key( $request->get_param( 'clone_from' ) ?? '' );
+
+		$result = OneDog_BBCA_Role_Editor::add_role( $name, $slug, $clone );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	public static function rename_role( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		$role = sanitize_key( $request->get_param( 'role' ) );
+		$label = sanitize_text_field( $request->get_param( 'label' ) );
+
+		$result = OneDog_BBCA_Role_Editor::rename_role( $role, $label );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	public static function delete_role( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+		$role = sanitize_key( $request->get_param( 'role' ) );
+		$result = OneDog_BBCA_Role_Editor::delete_role( $role );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	/*
+	|--------------------------------------------------------------------------
+	| Import / Export Endpoints
+	|--------------------------------------------------------------------------
+	*/
+
+	public static function export_config() {
+		global $wp_roles;
+
+		$config = [
+			'version' => BBCA_VER,
+			'exported_at' => gmdate( 'Y-m-d H:i:s' ),
+			'roles' => [],
+			'menu_rules' => get_option( 'onedog_bbca_menu_visibility', [] ),
+			'toolbar_rules' => get_option( 'onedog_bbca_toolbar_visibility', [] ),
+			'modules' => get_option( 'onedog_bbca_modules', [] ),
+			'templates' => get_option( 'onedog_bbca_template', [] ),
+			'notice_cleaner' => get_option( 'onedog_bbca_notice_cleaner', [] ),
+		];
+
+		// Export all role capabilities.
+		foreach ( $wp_roles->roles as $slug => $role ) {
+			$config['roles'][ $slug ] = [
+				'name' => $role['name'],
+				'capabilities' => $role['capabilities'],
+			];
+		}
+
+		return rest_ensure_response( $config );
+	}
+
+	public static function import_config( $request ) {
+		global $wp_roles;
+
+		$config = $request->get_json_params();
+
+		if ( empty( $config ) || ! is_array( $config ) ) {
+			return new WP_Error( 'invalid_data', __( 'Invalid configuration data.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		// Import roles.
+		if ( isset( $config['roles'] ) && is_array( $config['roles'] ) ) {
+			foreach ( $config['roles'] as $slug => $role_data ) {
+				$slug = sanitize_key( $slug );
+				$name = sanitize_text_field( $role_data['name'] ?? $slug );
+				$caps = isset( $role_data['capabilities'] ) && is_array( $role_data['capabilities'] )
+					? $role_data['capabilities']
+					: [];
+
+				$existing = get_role( $slug );
+				if ( $existing ) {
+					// Update existing role.
+					foreach ( array_keys( $existing->capabilities ) as $cap ) {
+						$existing->remove_cap( $cap );
+					}
+					foreach ( $caps as $cap => $granted ) {
+						if ( $granted ) {
+							$existing->add_cap( sanitize_key( $cap ) );
+						}
+					}
+				} else {
+					// Create new role.
+					$sanitized_caps = [];
+					foreach ( $caps as $cap => $granted ) {
+						if ( $granted ) {
+							$sanitized_caps[ sanitize_key( $cap ) ] = true;
+						}
+					}
+					add_role( $slug, $name, $sanitized_caps );
+				}
+			}
+		}
+
+		// Import menu rules.
+		if ( isset( $config['menu_rules'] ) && is_array( $config['menu_rules'] ) ) {
+			update_option( 'onedog_bbca_menu_visibility', $config['menu_rules'] );
+		}
+
+		// Import toolbar rules.
+		if ( isset( $config['toolbar_rules'] ) && is_array( $config['toolbar_rules'] ) ) {
+			update_option( 'onedog_bbca_toolbar_visibility', $config['toolbar_rules'] );
+		}
+
+		// Import modules.
+		if ( isset( $config['modules'] ) && is_array( $config['modules'] ) ) {
+			update_option( 'onedog_bbca_modules', array_map( 'sanitize_text_field', $config['modules'] ) );
+		}
+
+		// Import templates.
+		if ( isset( $config['templates'] ) && is_array( $config['templates'] ) ) {
+			update_option( 'onedog_bbca_template', array_map( 'sanitize_text_field', $config['templates'] ) );
+		}
+
+		// Import notice cleaner settings.
+		if ( isset( $config['notice_cleaner'] ) && is_array( $config['notice_cleaner'] ) ) {
+			update_option( 'onedog_bbca_notice_cleaner', $config['notice_cleaner'] );
+		}
+
+		return rest_ensure_response( [ 'success' => true ] );
 	}
 }
 

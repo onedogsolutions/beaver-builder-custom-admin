@@ -2,113 +2,157 @@
 
 ## Release state
 
-**`main` is at v0.2.0** as of Phase 2, the React/audit remediation release. It was at v0.1.0 (commit `9d2a69a`) immediately before. Phase 2 adds the React settings UI, REST API, transient caching, vanilla JS dashboard panel, and resolves all 14 legitimate Plugin Auditor findings.
+**`main` is at v1.0.0** as of Phase 3, the major feature expansion release. Previous: v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: Phase 2 (React settings UI, audit remediation, JS modernization)
+## Current Phase: Phase 3 (Role Editor, Menu Restrictor, Tailwind CSS)
 
-### Phase 2 Modifications (v0.2.0)
+### Phase 3 Modifications (v1.0.0)
 
-Plugin Auditor scan reported 39 findings across 9 categories. After triage, 14 were legitimate and 25 were false positives (pattern-matching on code that does not exist in this plugin — `eval()`, `unserialize()`, remote requests, etc.).
+Major feature expansion adding Role & Capability Management, enhanced Menu Restrictor with URL access prevention, and complete frontend rebuild with Tailwind CSS v4.
 
-**Architecture change — settings UI moved from BB's PHP panel to a standalone React app.**
+**Architecture change — Tailwind CSS v4 + component-based React.**
 
-The v0.1.0 settings form was rendered inside Beaver Builder's admin settings panel via `fl_builder_admin_settings_nav_items` / `fl_builder_admin_settings_render_forms` hooks. This created a hard dependency on `FLBuilderAdminSettings::render_form_action()` and mixed PHP template rendering with BB internals.
+The settings UI has been completely rebuilt using Tailwind CSS v4 (matching `onedogsolutions/google-security-for-wordpress` patterns) with a modular component architecture.
 
-v0.2.0 replaces this with:
-- A dedicated admin page at **Settings → Custom Admin** (`add_options_page`)
-- A React app (`src/settings/`) using `@wordpress/element`, `@wordpress/components`, `@wordpress/api-fetch`
-- REST endpoints (`onedog-bbca/v1`) for layout retrieval and settings persistence
-- Build via `@wordpress/scripts` (webpack, outputs to `build/`)
+- **Build tooling:** `@wordpress/scripts` + `@tailwindcss/postcss` v4 + PostCSS + autoprefixer
+- **Entry point:** `src/index.js` → `build/index.js` + `build/index.css`
+- **Styling:** Tailwind utility classes, custom animations (`fadeIn`, `slideIn`)
+- **Data passing:** `wp_localize_script()` → `window.bbcaSettings` (nonce, restUrl, version)
 
-BB is still required for layout *rendering* on the dashboard (`do_shortcode`), but no longer for the settings *UI*.
+**New Module: Role & Capability Editor (`role-editor`).**
 
-**REST API — `classes/class-onedog-bb-rest.php`.**
+Full WordPress role management with rollback support:
+
+| Feature | Description |
+|---------|-------------|
+| Role Selector | Dropdown listing all active user roles |
+| Add Role Modal | Create custom roles (blank or clone from existing) |
+| Rename Role Modal | Edit display labels for custom roles |
+| Delete Role Modal | Delete custom roles (prevents deletion if users assigned) |
+| Clear All Capabilities | Strip all granted capabilities for active role |
+| Rollback / Reset | Restore core roles to default WordPress capability snapshot |
+| Capability Tree | Dynamic categorization (General, Posts, Pages, Themes, Plugins, Users, Deprecated, CPT/Plugin groups) |
+| Search | Real-time client-side capability slug/label filter |
+| Human Readable Toggle | `edit_others_posts` → "Edit Others Posts" |
+| Granted Only Toggle | Filter view to checked capabilities |
+
+**Rollback System:** On initial plugin setup or first modification of a core WP role (`administrator`, `editor`, `author`, `contributor`, `subscriber`), a snapshot of default capabilities is saved to `wp_options` (`onedog_bbca_role_snapshots`) as a recovery baseline.
+
+**Enhanced Module: Menu Restrictor.**
+
+- **Direct URL Access Prevention:** Hook into `admin_init` at priority 9999. If a user attempts to manually navigate to a restricted admin page URL, block access with `wp_die( __( 'You are not allowed to access this page.' ) )`.
+- **Filter options:** All Items / Blocked Only / Visible Only
+
+**New: Import / Export System.**
+
+Download full capability configurations and menu restrictions as a `.json` file, and import JSON to sync environments across client sites.
+
+Export includes:
+- All role capabilities
+- Menu visibility rules
+- Toolbar visibility rules
+- Module settings
+- Welcome screen template assignments
+- Notice cleaner settings
+
+**REST API — New Endpoints.**
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/onedog-bbca/v1/layouts` | GET | Returns BB layout templates + user roles + BB active status |
-| `/onedog-bbca/v1/settings` | GET | Returns current role-to-template mapping |
-| `/onedog-bbca/v1/settings` | POST | Saves sanitized role-to-template mapping |
+| `/onedog-bbca/v1/roles` | GET | List all roles |
+| `/onedog-bbca/v1/roles` | POST | Create new role |
+| `/onedog-bbca/v1/roles/{role}` | GET | Get role capabilities |
+| `/onedog-bbca/v1/roles/{role}` | POST | Save role capabilities |
+| `/onedog-bbca/v1/roles/{role}` | DELETE | Delete role |
+| `/onedog-bbca/v1/roles/{role}/clear` | POST | Clear all capabilities |
+| `/onedog-bbca/v1/roles/{role}/rollback` | POST | Reset to defaults |
+| `/onedog-bbca/v1/roles/{role}/rename` | POST | Rename role |
+| `/onedog-bbca/v1/export` | GET | Export configuration |
+| `/onedog-bbca/v1/import` | POST | Import configuration |
 
-All routes require `manage_options` capability. POST validates input is an array of strings.
-
-**Performance — transient caching for layout queries.**
-
-`get_posts()` for BB templates is now cached in a transient (`onedog_bbca_templates`, 12h TTL). Cache is flushed on `save_post_fl-builder-template` and `deleted_post` (when post type matches). Query args include `suppress_filters => true` and `no_found_rows => true` (audit finding S3/P1).
-
-**Security — audit findings resolved.**
-
-- S6 (unsafe file inclusion): `file_exists()` guard before `include` in `welcome_panel()`.
-- S8 (XSS via get_selected): Method removed entirely; React escapes by default.
-- S3 (get_posts): `suppress_filters`, `no_found_rows` added; no user input reaches query.
-
-**Standards — inline assets eliminated.**
-
-- ST5/ST16/ST17: Inline `<style>` and `<script>` blocks removed from `welcome-panel.php`. Styles moved to `assets/css/frontend.css`, script to `assets/js/frontend.js`. Both enqueued conditionally on `index.php` only when the panel is active.
-- ST9: `@package` added to all DocBlocks.
-- ST11: Activation function renamed to `onedog_bbca_activate()`.
-- ST13: Resolved by React (no PHP-rendered select attributes).
-
-**Compatibility — jQuery removed.**
-
-- C1: Dashboard panel script is now vanilla ES2020+ (`Element.before()`). No jQuery dependency. Loaded with `defer` strategy.
-- C2: `Requires at least: 5.0` and `Tested up to: 6.8` added to plugin header.
-- C3: `Requires PHP: 7.4` added to plugin header.
-
-**Privacy & Accessibility.**
-
-- PV1: Privacy section added to readme.txt (no data collection, no cookies, no external requests).
-- A1: React `SelectControl` provides accessible labels natively (role name is the label).
-
-**Plugin Review.**
-
-- PR2: Non-affiliation disclaimer added to readme.txt.
+All routes require `manage_options` capability.
 
 **Removed:**
-- `includes/admin-settings.php` (replaced by React app)
-- `bb_nav_items()`, `bb_nav_forms()`, `save_settings()`, `get_selected()`, `get_bb_templates()` from core class
-- All `fl_builder_admin_settings_*` hooks
-- jQuery dependency for dashboard panel
+- `src/settings/` directory (replaced by `src/components/`)
+- `@wordpress/components` dependency (replaced by Tailwind-styled native elements)
+- `assets/css/admin.css` (replaced by compiled Tailwind CSS)
 
 **Added:**
-- `classes/class-onedog-bb-rest.php` — REST controller
-- `src/settings/index.js` — React entry point
-- `src/settings/app.js` — SettingsApp component
-- `assets/js/frontend.js` — vanilla JS panel repositioning
-- `assets/css/frontend.css` — dashboard panel styles
-- `webpack.config.js` — custom entry point for wp-scripts
-- `package.json` — build tooling
+- `src/index.js` — New entry point
+- `src/styles/index.css` — Tailwind CSS v4 import
+- `src/components/App.jsx` — Main app with tab navigation
+- `src/components/RoleEditor.jsx` — Role & capability management
+- `src/components/MenuRestrictor.jsx` — Menu/toolbar visibility
+- `src/components/WelcomeScreen.jsx` — BB template assignment
+- `src/components/ModuleSettings.jsx` — Module toggles
+- `src/components/ImportExport.jsx` — JSON import/export
+- `includes/modules/class-role-editor.php` — Role editor PHP controller
+- `postcss.config.js` — PostCSS with Tailwind v4 plugin
 
-**Target structure (v0.2.0):**
+**Target structure (v1.0.0):**
 
 ```
 beaver-builder-custom-admin/
 ├── assets/
 │   ├── css/
-│   │   ├── admin.css
 │   │   └── frontend.css
 │   └── js/
 │       └── frontend.js
 ├── build/
-│   ├── settings.js
-│   └── settings.asset.php
+│   ├── index.js
+│   ├── index.css
+│   ├── index-rtl.css
+│   └── index.asset.php
 ├── classes/
-│   ├── class-onedog-bb-custom-admin.php
 │   └── class-onedog-bb-rest.php
 ├── includes/
+│   ├── modules/
+│   │   ├── class-module-loader.php
+│   │   ├── class-role-editor.php
+│   │   ├── class-menu-visibility.php
+│   │   ├── class-welcome-screen.php
+│   │   └── class-notice-cleaner.php
 │   └── welcome-panel.php
 ├── src/
-│   └── settings/
-│       ├── index.js
-│       └── app.js
+│   ├── index.js
+│   ├── styles/
+│   │   └── index.css
+│   └── components/
+│       ├── App.jsx
+│       ├── RoleEditor.jsx
+│       ├── MenuRestrictor.jsx
+│       ├── WelcomeScreen.jsx
+│       ├── ModuleSettings.jsx
+│       └── ImportExport.jsx
 ├── beaver-builder-custom-admin.php
 ├── package.json
+├── postcss.config.js
 ├── webpack.config.js
 ├── readme.txt
 ├── LICENSE
 ├── .gitignore
 └── STATE.md
 ```
+
+## Historical Phase: Phase 2 (React settings UI, audit remediation)
+
+### Phase 2 Modifications (v0.2.0)
+
+Plugin Auditor scan reported 39 findings across 9 categories. After triage, 14 were legitimate and 25 were false positives.
+
+**Architecture change — settings UI moved from BB's PHP panel to a standalone React app.**
+
+v0.2.0 replaced the BB-dependent settings form with:
+- A dedicated admin page at **Settings → Custom Admin** (`add_options_page`)
+- A React app using `@wordpress/element`, `@wordpress/components`, `@wordpress/api-fetch`
+- REST endpoints (`onedog-bbca/v1`) for layout retrieval and settings persistence
+- Build via `@wordpress/scripts` (webpack, outputs to `build/`)
+
+**Module system added (v0.3.0):**
+- `includes/modules/class-module-loader.php` — Module registration and conditional loading
+- `includes/modules/class-welcome-screen.php` — Dashboard welcome templates
+- `includes/modules/class-menu-visibility.php` — Admin menu/toolbar visibility
+- `includes/modules/class-notice-cleaner.php` — Admin notice cleanup
 
 ## Historical Phase: Phase 1 (clone, namespace refactor, and modernization)
 
@@ -123,6 +167,8 @@ Forked from [helloideabox/beaver-builder-dashboard-welcome](https://github.com/h
 - **Text domain:** `bb-custom-admin` for all translatable strings.
 - **Author:** Ryan Waterbury, One Dog Solutions — https://onedog.solutions/
 - **License:** GPL-2.0, matching upstream and WordPress core.
-- **Build:** `@wordpress/scripts` (webpack). `build/` is committed; `node_modules/` is not.
+- **Build:** `@wordpress/scripts` + Tailwind CSS v4. `build/` is committed; `node_modules/` is not.
 - **JS:** React via WordPress packages for admin UI; vanilla ES2020+ for frontend. No jQuery.
+- **CSS:** Tailwind CSS v4 utility-first framework.
 - **REST namespace:** `onedog-bbca/v1`.
+- **Storage:** `WP_Roles` API and `wp_options` only. No custom database tables.

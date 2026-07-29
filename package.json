@@ -1,7 +1,7 @@
 {
 	"name": "beaver-builder-custom-admin",
-	"version": "0.2.0",
-	"description": "Replaces the default WordPress dashboard welcome panel with a Beaver Builder template.",
+	"version": "1.0.0",
+	"description": "Modular WordPress admin customization — role editor, menu restrictor, dashboard welcome templates, and more.",
 	"author": "Ryan Waterbury",
 	"license": "GPL-2.0-or-later",
 	"homepage": "https://onedog.solutions/",
@@ -9,14 +9,17 @@
 		"build": "wp-scripts build",
 		"start": "wp-scripts start",
 		"lint:js": "wp-scripts lint-js src/",
-		"lint:css": "wp-scripts lint-style assets/css/"
+		"lint:css": "wp-scripts lint-style src/"
 	},
 	"devDependencies": {
-		"@wordpress/scripts": "^30.0.0"
+		"@wordpress/scripts": "^30.0.0",
+		"@tailwindcss/postcss": "^4.0.0",
+		"tailwindcss": "^4.0.0",
+		"postcss": "^8.4.31",
+		"autoprefixer": "^10.4.16"
 	},
 	"dependencies": {
 		"@wordpress/api-fetch": "^7.0.0",
-		"@wordpress/components": "^28.0.0",
 		"@wordpress/element": "^6.0.0",
 		"@wordpress/i18n": "^5.0.0"
 	}

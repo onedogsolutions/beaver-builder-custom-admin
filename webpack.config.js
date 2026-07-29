@@ -4,7 +4,7 @@ const path = require( 'path' );
 module.exports = {
 	...defaultConfig,
 	entry: {
-		settings: path.resolve( __dirname, 'src', 'settings', 'index.js' ),
+		index: path.resolve( __dirname, 'src', 'index.js' ),
 	},
 	output: {
 		...defaultConfig.output,
