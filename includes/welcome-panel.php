@@ -2,8 +2,9 @@
 /**
  * Template for the custom welcome panel rendered on the dashboard.
  *
- * Styles are enqueued via assets/css/frontend.css.
- * Script is enqueued via assets/js/frontend.js.
+ * Variables provided by the calling module:
+ * - $layout_slug (string) The BB layout slug to render.
+ * - $classes     (string) Additional CSS classes for the wrapper.
  *
  * @since 0.1.0
  * @package OneDog\BBCustomAdmin
@@ -11,11 +12,10 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$layout_slug = isset( self::$template[ self::$current_role ] )
-	? self::$template[ self::$current_role ]
-	: '';
+$layout_slug = isset( $layout_slug ) ? $layout_slug : '';
+$classes     = isset( $classes ) ? $classes : '';
 ?>
-<div id="onedog-bbca-panel" class="<?php echo esc_attr( self::$classes ); ?>">
+<div id="onedog-bbca-panel" class="<?php echo esc_attr( $classes ); ?>">
 	<?php
 	if ( ! empty( $layout_slug ) ) {
 		echo do_shortcode( '[fl_builder_insert_layout slug="' . esc_attr( $layout_slug ) . '"]' );

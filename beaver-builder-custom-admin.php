@@ -1,10 +1,10 @@
 <?php
 /**
  * Plugin Name: Beaver Builder Custom Admin
- * Description: Replaces the default WordPress dashboard welcome panel with a Beaver Builder template, selectable per user role.
+ * Description: Modular WordPress admin customization — dashboard welcome templates, menu/toolbar visibility, and notice cleaner by user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
- * Version: 0.2.0
+ * Version: 0.3.0
  * Requires at least: 5.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
@@ -18,14 +18,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '0.2.0' );
+define( 'BBCA_VER', '0.3.0' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );
 
 /**
  * The legacy plugin this replaces.
- * Used for migration and deactivation on activation.
  */
 define( 'BBCA_LEGACY_PLUGIN', 'bb-dashboard-welcome/bb-dashboard-welcome.php' );
 define( 'BBCA_LEGACY_OPTION', 'bbpd_template' );
@@ -38,7 +37,6 @@ define( 'BBCA_LEGACY_OPTION', 'bbpd_template' );
  * @return void
  */
 function onedog_bbca_activate() {
-	// Migrate legacy option if it exists and the new one does not.
 	$legacy = get_option( BBCA_LEGACY_OPTION );
 	$new    = get_option( 'onedog_bbca_template' );
 
@@ -47,7 +45,6 @@ function onedog_bbca_activate() {
 		delete_option( BBCA_LEGACY_OPTION );
 	}
 
-	// Deactivate the legacy plugin if active.
 	if ( is_plugin_active( BBCA_LEGACY_PLUGIN ) ) {
 		deactivate_plugins( BBCA_LEGACY_PLUGIN );
 	}
@@ -118,6 +115,6 @@ function onedog_bbca_enqueue_settings_assets( $hook_suffix ) {
 }
 add_action( 'admin_enqueue_scripts', 'onedog_bbca_enqueue_settings_assets' );
 
-// Load plugin classes.
-require_once BBCA_DIR . 'classes/class-onedog-bb-custom-admin.php';
+// Load REST API and module system.
 require_once BBCA_DIR . 'classes/class-onedog-bb-rest.php';
+require_once BBCA_DIR . 'includes/modules/class-module-loader.php';
