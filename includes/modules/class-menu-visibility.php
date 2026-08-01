@@ -213,6 +213,16 @@ final class OneDog_BBCA_Menu_Visibility {
 
 		$items = [];
 
+		// REST/AJAX requests skip the wp-admin bootstrap, so the $menu and
+		// $submenu globals are never built there. Load the admin API files and
+		// the menu builder on demand so plugin-registered pages are included.
+		// Note: plugins that guard their admin_menu callbacks behind is_admin()
+		// will not appear, since is_admin() is false in a REST context.
+		if ( ! is_array( $menu ) ) {
+			require_once ABSPATH . 'wp-admin/includes/admin.php';
+			require_once ABSPATH . 'wp-admin/menu.php';
+		}
+
 		if ( ! is_array( $menu ) ) {
 			return $items;
 		}
