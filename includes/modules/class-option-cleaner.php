@@ -141,6 +141,121 @@ final class OneDog_BBCA_Option_Cleaner {
 	}
 
 	/**
+	 * Scans all roles for orphaned (ghost) capabilities.
+	 *
+	 * Groups non-core capabilities by prefix and excludes those owned
+	 * by installed plugins. Returns groups with the roles they appear in.
+	 *
+	 * @since 1.1.0
+	 * @return array {
+	 *     @type array $groups Array of group arrays with prefix, count, roles, samples.
+	 * }
+	 */
+	public static function scan_orphaned_capabilities() {
+		global $wp_roles;
+
+		$core_caps = self::get_core_capabilities();
+		$owned     = self::get_owned_prefixes();
+		$groups    = [];
+
+		foreach ( $wp_roles->roles as $role_slug => $role_data ) {
+			if ( empty( $role_data['capabilities'] ) || ! is_array( $role_data['capabilities'] ) ) {
+				continue;
+			}
+
+			foreach ( array_keys( $role_data['capabilities'] ) as $cap ) {
+				// Skip WordPress core capabilities.
+				if ( isset( $core_caps[ $cap ] ) ) {
+					continue;
+				}
+
+				// Determine the group key (first prefix segment).
+				$key = self::extract_group_key( $cap );
+
+				if ( '' === $key ) {
+					// No underscore — treat the whole cap as the key.
+					$key = strtolower( $cap );
+				}
+
+				// Skip capabilities owned by installed plugins.
+				if ( in_array( $key, $owned, true ) ) {
+					continue;
+				}
+
+				if ( ! isset( $groups[ $key ] ) ) {
+					$groups[ $key ] = [
+						'prefix'  => $key,
+						'count'   => 0,
+						'roles'   => [],
+						'samples' => [],
+					];
+				}
+
+				$groups[ $key ]['count']++;
+
+				if ( ! in_array( $role_slug, $groups[ $key ]['roles'], true ) ) {
+					$groups[ $key ]['roles'][] = $role_slug;
+				}
+
+				if ( count( $groups[ $key ]['samples'] ) < 5 && ! in_array( $cap, $groups[ $key ]['samples'], true ) ) {
+					$groups[ $key ]['samples'][] = $cap;
+				}
+			}
+		}
+
+		$orphans = array_values( $groups );
+
+		// Sort by count descending.
+		usort(
+			$orphans,
+			static function ( $a, $b ) {
+				return $b['count'] - $a['count'];
+			}
+		);
+
+		return [ 'groups' => $orphans ];
+	}
+
+	/**
+	 * Removes all capabilities matching the given prefixes from every role.
+	 *
+	 * @since 1.1.0
+	 * @param array $prefixes Array of capability prefixes to strip.
+	 * @return int Total number of capability removals.
+	 */
+	public static function delete_capabilities_by_prefix( array $prefixes ) {
+		global $wp_roles;
+
+		$removed = 0;
+
+		$sanitized = array_filter( array_map( 'sanitize_key', $prefixes ) );
+
+		if ( empty( $sanitized ) ) {
+			return 0;
+		}
+
+		foreach ( $wp_roles->roles as $role_slug => $role_data ) {
+			$role = get_role( $role_slug );
+
+			if ( ! $role || empty( $role_data['capabilities'] ) ) {
+				continue;
+			}
+
+			foreach ( array_keys( $role_data['capabilities'] ) as $cap ) {
+				foreach ( $sanitized as $prefix ) {
+					if ( 0 === strpos( $cap, $prefix ) ) {
+						$role->remove_cap( $cap );
+						$removed++;
+						break;
+					}
+				}
+			}
+		}
+
+		return $removed;
+	}
+
+	/**
 	 * Deletes all options matching the given prefixes.
 	 *
 	 * Also removes matching transients (_transient_{prefix}% and
@@ -320,6 +435,90 @@ final class OneDog_BBCA_Option_Cleaner {
 		$owned[] = 'onedog_bbca';
 
 		return array_unique( $owned );
+	}
+
+	/**
+	 * Returns the full set of WordPress core capabilities as a lookup map.
+	 *
+	 * Any capability not in this map is considered non-core (plugin- or
+	 * custom-added).
+	 *
+	 * @since 1.1.0
+	 * @return array Associative array of cap => true.
+	 */
+	private static function get_core_capabilities() {
+		$caps = [
+			// Meta / general.
+			'read',
+			'exist',
+			'activate_plugins',
+			'create_users',
+			'delete_plugins',
+			'delete_themes',
+			'delete_users',
+			'edit_dashboard',
+			'edit_files',
+			'edit_plugins',
+			'edit_theme_options',
+			'edit_themes',
+			'edit_users',
+			'export',
+			'import',
+			'install_plugins',
+			'install_themes',
+			'list_users',
+			'manage_categories',
+			'manage_links',
+			'manage_options',
+			'moderate_comments',
+			'promote_users',
+			'remove_users',
+			'switch_themes',
+			'unfiltered_html',
+			'unfiltered_upload',
+			'update_core',
+			'update_plugins',
+			'update_themes',
+			'upload_plugins',
+			'upload_themes',
+			'customize',
+			'delete_site',
+			// Posts.
+			'edit_posts',
+			'edit_others_posts',
+			'edit_private_posts',
+			'edit_published_posts',
+			'publish_posts',
+			'read_private_posts',
+			'delete_posts',
+			'delete_others_posts',
+			'delete_private_posts',
+			'delete_published_posts',
+			// Pages.
+			'edit_pages',
+			'edit_others_pages',
+			'edit_private_pages',
+			'edit_published_pages',
+			'publish_pages',
+			'read_private_pages',
+			'delete_pages',
+			'delete_others_pages',
+			'delete_private_pages',
+			'delete_published_pages',
+			// Media.
+			'upload_files',
+			// Network / multisite.
+			'manage_network',
+			'manage_sites',
+			'manage_network_users',
+			'manage_network_plugins',
+			'manage_network_themes',
+			'manage_network_options',
+			'upgrade_network',
+			'setup_network',
+		];
+
+		return array_fill_keys( $caps, true );
 	}
 
 	/**

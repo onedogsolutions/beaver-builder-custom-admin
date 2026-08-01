@@ -8,12 +8,13 @@
 
 ### v1.1.0 Modifications
 
-New module: Orphaned Option Cleaner (`option-cleaner`). Detects and removes leftover `wp_options` entries from plugins that were deleted without cleaning up after themselves (e.g. WP Amelia, Rank Math).
+New module: Orphaned Option Cleaner (`option-cleaner`). Detects and removes leftover `wp_options` entries **and** ghost role capabilities from plugins that were deleted without cleaning up after themselves (e.g. WP Amelia, Rank Math).
 
 **Detection logic.**
 
-- Auto mode: scans all option names, groups them by prefix (first underscore segment, or first two segments when the first token is under 4 chars), then excludes groups owned by installed plugins (derived from `get_plugins()` directory slugs, basenames, and TextDomain headers), WordPress core (static safelist + table-prefix options), and this plugin (`onedog_bbca`). Singleton groups are also excluded.
-- Manual mode: optional prefix input for targeted scans (e.g. `rank_math_`).
+- Options auto mode: scans all option names, groups them by prefix (first underscore segment, or first two segments when the first token is under 4 chars), then excludes groups owned by installed plugins (derived from `get_plugins()` directory slugs, basenames, and TextDomain headers), WordPress core (static safelist + table-prefix options), and this plugin (`onedog_bbca`). Singleton groups are also excluded.
+- Options manual mode: optional prefix input for targeted scans (e.g. `rank_math_`).
+- Capabilities mode: iterates all roles, collects non-core capabilities (checked against the full WordPress core capability map), groups by prefix, and excludes prefixes owned by installed plugins. Results show affected roles and sample capability slugs.
 
 **Deletion safety.**
 
@@ -28,15 +29,20 @@ New module: Orphaned Option Cleaner (`option-cleaner`). Detects and removes left
 |-------|--------|---------|
 | `/onedog-bbca/v1/option-cleaner/scan` | GET | Scan for orphaned option groups (optional `?prefix=` param) |
 | `/onedog-bbca/v1/option-cleaner/delete` | POST | Delete options matching selected prefixes |
+| `/onedog-bbca/v1/option-cleaner/capabilities` | GET | Scan all roles for ghost capabilities |
+| `/onedog-bbca/v1/option-cleaner/capabilities/delete` | POST | Strip selected capability prefixes from all roles |
 
-Both routes require `manage_options` capability and guard with `class_exists( 'OneDog_BBCA_Option_Cleaner' )`.
+All routes require `manage_options` capability and guard with `class_exists( 'OneDog_BBCA_Option_Cleaner' )`.
 
 **Files changed:**
-- `includes/modules/class-option-cleaner.php` — New module class (scan, delete, prefix grouping, core safelist)
+- `includes/modules/class-option-cleaner.php` — New module class (option scan/delete, capability scan/strip, prefix grouping, core safelists)
 - `includes/modules/class-module-loader.php` — Registered `option-cleaner` module + metadata
 - `classes/class-onedog-bb-rest.php` — Added scan/delete routes and handlers
 - `src/components/OptionCleaner.jsx` — New React tab component
 - `src/components/App.jsx` — Added Option Cleaner tab
+- `beaver-builder-custom-admin.php` — Version bumped to 1.1.0
+- `package.json` — Version bumped to 1.1.0
+- `readme.txt` — Stable tag 1.1.0, changelog entries for 1.0.0–1.1.0
 - `build/*` — Regenerated
 
 ---

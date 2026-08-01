@@ -4,7 +4,7 @@
  * Description: Modular WordPress admin customization — dashboard welcome templates, menu/toolbar visibility, and notice cleaner by user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
- * Version: 0.3.0
+ * Version: 1.1.0
  * Requires at least: 5.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '1.0.0' );
+define( 'BBCA_VER', '1.1.0' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );

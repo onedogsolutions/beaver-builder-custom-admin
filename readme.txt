@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard, welcome panel, admin, custom
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 1.1.0
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,22 @@ All data remains local to your WordPress installation.
 
 == Changelog ==
 
+= 1.1.0 =
+* New module: Orphaned Option Cleaner — detect and remove leftover wp_options entries from uninstalled plugins.
+* Ghost capability detection — scan all roles for capabilities left behind by removed plugins and strip them in bulk.
+* New REST endpoints: /option-cleaner/scan, /option-cleaner/delete, /option-cleaner/capabilities, /option-cleaner/capabilities/delete.
+* New "Option Cleaner" tab in Settings → Custom Admin.
+
+= 1.0.1 =
+* Fixed settings page failing to render on WordPress < 6.5 (classic JSX runtime).
+* Settings menu registration hardened with priority 25.
+
+= 1.0.0 =
+* New module: Role & Capability Editor with rollback support.
+* Enhanced Menu Restrictor with direct URL access prevention.
+* Settings UI rebuilt with Tailwind CSS v4 and component-based React.
+* New Import / Export system for full configuration backup and sync.
+
 = 0.2.0 =
 * React-based settings page (Settings → Custom Admin) using WordPress components.
 * REST API endpoints for layout retrieval and settings management.
@@ -85,6 +101,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+New Option Cleaner module: find and remove ghost options and capabilities left behind by uninstalled plugins.
 
 = 0.2.0 =
 Major update: new React settings UI, REST API, performance caching, and full audit remediation. Settings moved from BB panel to Settings → Custom Admin.
