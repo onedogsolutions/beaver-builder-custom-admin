@@ -100,6 +100,19 @@ final class OneDog_BB_REST {
 			],
 		] );
 
+		// Option cleaner.
+		register_rest_route( self::NAMESPACE, '/option-cleaner/scan', [
+			'methods'             => 'GET',
+			'callback'            => [ __CLASS__, 'scan_options' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/option-cleaner/delete', [
+			'methods'             => 'POST',
+			'callback'            => [ __CLASS__, 'delete_options' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
+
 		// Role Editor endpoints.
 		register_rest_route( self::NAMESPACE, '/roles', [
 			[
@@ -340,6 +353,39 @@ final class OneDog_BB_REST {
 		update_option( 'onedog_bbca_notice_cleaner', $sanitized );
 
 		return rest_ensure_response( [ 'success' => true, 'settings' => $sanitized ] );
+	}
+
+	/*
+	|--------------------------------------------------------------------------
+	| Option Cleaner Endpoints
+	|--------------------------------------------------------------------------
+	*/
+
+	public static function scan_options( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Option_Cleaner' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Option Cleaner module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$prefix = sanitize_text_field( $request->get_param( 'prefix' ) ?? '' );
+		$result = OneDog_BBCA_Option_Cleaner::scan( $prefix );
+
+		return rest_ensure_response( $result );
+	}
+
+	public static function delete_options( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Option_Cleaner' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Option Cleaner module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$prefixes = $request->get_param( 'prefixes' );
+
+		if ( ! is_array( $prefixes ) || empty( $prefixes ) ) {
+			return new WP_Error( 'invalid_data', __( 'Prefixes must be a non-empty array.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$deleted = OneDog_BBCA_Option_Cleaner::delete_prefixes( $prefixes );
+
+		return rest_ensure_response( [ 'success' => true, 'deleted' => $deleted ] );
 	}
 
 	/*

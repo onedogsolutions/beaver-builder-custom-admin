@@ -2,9 +2,46 @@
 
 ## Release state
 
-**`main` is at v1.0.1** as of the settings loading fix. Previous: v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.1.0** as of the Option Cleaner feature. Previous: v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: Patch v1.0.1 (Settings Loading Fix)
+## Current Phase: v1.1.0 (Orphaned Option Cleaner)
+
+### v1.1.0 Modifications
+
+New module: Orphaned Option Cleaner (`option-cleaner`). Detects and removes leftover `wp_options` entries from plugins that were deleted without cleaning up after themselves (e.g. WP Amelia, Rank Math).
+
+**Detection logic.**
+
+- Auto mode: scans all option names, groups them by prefix (first underscore segment, or first two segments when the first token is under 4 chars), then excludes groups owned by installed plugins (derived from `get_plugins()` directory slugs, basenames, and TextDomain headers), WordPress core (static safelist + table-prefix options), and this plugin (`onedog_bbca`). Singleton groups are also excluded.
+- Manual mode: optional prefix input for targeted scans (e.g. `rank_math_`).
+
+**Deletion safety.**
+
+- All queries use `$wpdb->prepare()` with `esc_like()`.
+- Prefixes sanitized via `sanitize_key()`.
+- Deletion requires explicit two-step confirmation in the UI.
+- Matching transients (`_transient_{prefix}%`, `_transient_timeout_{prefix}%`) are removed alongside options.
+
+**REST API — New Endpoints.**
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/onedog-bbca/v1/option-cleaner/scan` | GET | Scan for orphaned option groups (optional `?prefix=` param) |
+| `/onedog-bbca/v1/option-cleaner/delete` | POST | Delete options matching selected prefixes |
+
+Both routes require `manage_options` capability and guard with `class_exists( 'OneDog_BBCA_Option_Cleaner' )`.
+
+**Files changed:**
+- `includes/modules/class-option-cleaner.php` — New module class (scan, delete, prefix grouping, core safelist)
+- `includes/modules/class-module-loader.php` — Registered `option-cleaner` module + metadata
+- `classes/class-onedog-bb-rest.php` — Added scan/delete routes and handlers
+- `src/components/OptionCleaner.jsx` — New React tab component
+- `src/components/App.jsx` — Added Option Cleaner tab
+- `build/*` — Regenerated
+
+---
+
+## Historical Phase: Patch v1.0.1 (Settings Loading Fix)
 
 ### v1.0.1 Modifications
 
