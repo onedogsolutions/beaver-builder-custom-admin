@@ -2,9 +2,32 @@
 
 ## Release state
 
-**`main` is at v1.0.0** as of Phase 3, the major feature expansion release. Previous: v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.0.1** as of the settings loading fix. Previous: v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: Phase 3 (Role Editor, Menu Restrictor, Tailwind CSS)
+## Current Phase: Patch v1.0.1 (Settings Loading Fix)
+
+### v1.0.1 Modifications
+
+Fixed settings page failing to render on WordPress < 6.5 and hardened Settings menu registration.
+
+**Bug fix — JSX runtime dependency.**
+
+The `@wordpress/babel-preset-default` hardcodes `@babel/plugin-transform-react-jsx` with `runtime: 'automatic'`, producing a `react-jsx-runtime` script dependency in `build/index.asset.php`. This WordPress script handle only exists in WP 6.5+. On older installs, `window.ReactJSXRuntime` is undefined and the React app throws immediately.
+
+Fix: `webpack.config.js` now overrides the babel-loader rule to use `@babel/preset-react` with `{ runtime: 'classic' }`. The build output uses `wp.element.createElement` (available since WP 5.0) and the asset dependencies are reduced to `wp-api-fetch`, `wp-element`, `wp-i18n`.
+
+**Hardening — Settings menu priority.**
+
+The `admin_menu` hook priority was raised from default (10) to 25, ensuring the Settings > Custom Admin page is registered independently even if Beaver Builder or other plugins manipulate menus at default priority.
+
+**Files changed:**
+- `webpack.config.js` — Classic JSX runtime override
+- `beaver-builder-custom-admin.php` — `admin_menu` priority 25
+- `build/*` — Regenerated
+
+---
+
+## Historical Phase: Phase 3 (Role Editor, Menu Restrictor, Tailwind CSS)
 
 ### Phase 3 Modifications (v1.0.0)
 

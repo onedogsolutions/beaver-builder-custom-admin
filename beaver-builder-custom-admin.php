@@ -66,7 +66,7 @@ function onedog_bbca_admin_menu() {
 		'onedog_bbca_render_settings_page'
 	);
 }
-add_action( 'admin_menu', 'onedog_bbca_admin_menu' );
+add_action( 'admin_menu', 'onedog_bbca_admin_menu', 25 );
 
 /**
  * Renders the settings page root element for React.
