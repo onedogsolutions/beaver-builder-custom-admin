@@ -14,7 +14,6 @@ import RoleEditor from './RoleEditor';
 import MenuRestrictor from './MenuRestrictor';
 import WelcomeScreen from './WelcomeScreen';
 import ModuleSettings from './ModuleSettings';
-import OptionCleaner from './OptionCleaner';
 import ImportExport from './ImportExport';
 
 const TABS = [
@@ -33,10 +32,6 @@ const TABS = [
 	{
 		id: 'modules',
 		label: __( 'Modules', 'bb-custom-admin' ),
-	},
-	{
-		id: 'option-cleaner',
-		label: __( 'Option Cleaner', 'bb-custom-admin' ),
 	},
 	{
 		id: 'import-export',
@@ -131,7 +126,6 @@ export default function App() {
 				{ activeTab === 'menus' && <MenuRestrictor showToast={ showToast } /> }
 				{ activeTab === 'welcome' && <WelcomeScreen showToast={ showToast } /> }
 				{ activeTab === 'modules' && <ModuleSettings showToast={ showToast } /> }
-				{ activeTab === 'option-cleaner' && <OptionCleaner showToast={ showToast } /> }
 				{ activeTab === 'import-export' && <ImportExport showToast={ showToast } /> }
 			</div>
 		</div>

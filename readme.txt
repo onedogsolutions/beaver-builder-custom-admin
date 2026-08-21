@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard, welcome panel, admin, custom
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,11 @@ All data remains local to your WordPress installation.
 
 == Changelog ==
 
+= 1.2.0 =
+* Removed the Orphaned Option Cleaner module — the feature has been ported to a dedicated standalone plugin.
+* Removed the /option-cleaner/* REST endpoints and the "Option Cleaner" settings tab.
+* Fixed Menu Restrictor settings UI not populating admin sidebar menus (admin menu is now built on demand in REST context).
+
 = 1.1.0 =
 * New module: Orphaned Option Cleaner — detect and remove leftover wp_options entries from uninstalled plugins.
 * Ghost capability detection — scan all roles for capabilities left behind by removed plugins and strip them in bulk.
@@ -101,6 +106,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+The Option Cleaner has moved to a standalone plugin and is no longer part of this plugin. Also fixes the Menu Restrictor menu list not loading.
 
 = 1.1.0 =
 New Option Cleaner module: find and remove ghost options and capabilities left behind by uninstalled plugins.

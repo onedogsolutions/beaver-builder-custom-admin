@@ -56,7 +56,6 @@ final class OneDog_BBCA_Module_Loader {
 			'welcome-screen'   => BBCA_DIR . 'includes/modules/class-welcome-screen.php',
 			'menu-visibility'  => BBCA_DIR . 'includes/modules/class-menu-visibility.php',
 			'notice-cleaner'   => BBCA_DIR . 'includes/modules/class-notice-cleaner.php',
-			'option-cleaner'   => BBCA_DIR . 'includes/modules/class-option-cleaner.php',
 		];
 	}
 
@@ -119,10 +118,6 @@ final class OneDog_BBCA_Module_Loader {
 			'notice-cleaner'  => [
 				'label'       => __( 'Admin UI & Notice Cleaner', 'bb-custom-admin' ),
 				'description' => __( 'Hide update notices, core alerts, and toolbar clutter for non-admin roles.', 'bb-custom-admin' ),
-			],
-			'option-cleaner'  => [
-				'label'       => __( 'Orphaned Option Cleaner', 'bb-custom-admin' ),
-				'description' => __( 'Detect and remove leftover wp_options entries from uninstalled plugins.', 'bb-custom-admin' ),
 			],
 		];
 

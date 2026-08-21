@@ -2,9 +2,31 @@
 
 ## Release state
 
-**`main` is at v1.1.0** as of the Option Cleaner feature. Previous: v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.2.0** as of the Option Cleaner removal (ported to a standalone plugin). Previous: v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.1.0 (Orphaned Option Cleaner)
+## Current Phase: v1.2.0 (Option Cleaner Removal + Menu Restrictor Fix)
+
+### v1.2.0 Modifications
+
+**Option Cleaner removed.** The Orphaned Option Cleaner module (`option-cleaner`) was ported to a dedicated standalone plugin and fully removed from this plugin: module class, loader registration, REST endpoints, and React tab.
+
+**Menu Restrictor fixed.** `OneDog_BBCA_Menu_Visibility::get_available_menus()` returned an empty list in REST context because the `$menu`/`$submenu` globals are only built during wp-admin page loads. The method now builds the admin menu on demand (`wp-admin/includes/admin.php` + `wp-admin/menu.php`, with `global $menu, $submenu` declared before the includes) so plugin-registered items appear in the settings UI. Verified live on the test site: 15 top-level menus returned, role-based hiding and direct-URL blocking confirmed end-to-end.
+
+**Files changed:**
+- `includes/modules/class-option-cleaner.php` — Deleted
+- `src/components/OptionCleaner.jsx` — Deleted
+- `includes/modules/class-module-loader.php` — Removed `option-cleaner` registry entry + metadata
+- `classes/class-onedog-bb-rest.php` — Removed the four `/option-cleaner/*` routes and handlers
+- `includes/modules/class-menu-visibility.php` — On-demand admin menu bootstrap in `get_available_menus()`
+- `src/components/App.jsx` — Removed Option Cleaner tab
+- `beaver-builder-custom-admin.php` — Version bumped to 1.2.0
+- `package.json` — Version bumped to 1.2.0
+- `readme.txt` — Stable tag 1.2.0, changelog + upgrade notice entries
+- `build/*` — Regenerated
+
+---
+
+## Historical Phase: v1.1.0 (Orphaned Option Cleaner)
 
 ### v1.1.0 Modifications
 
