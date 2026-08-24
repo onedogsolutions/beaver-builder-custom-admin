@@ -38,24 +38,11 @@ final class OneDog_BB_REST {
 	 * @return void
 	 */
 	public static function register_routes() {
-		// Welcome screen: layouts + settings.
+		// Layouts (used by Dashboard Canvas settings).
 		register_rest_route( self::NAMESPACE, '/layouts', [
 			'methods'             => 'GET',
 			'callback'            => [ __CLASS__, 'get_layouts' ],
 			'permission_callback' => [ __CLASS__, 'check_permission' ],
-		] );
-
-		register_rest_route( self::NAMESPACE, '/settings', [
-			[
-				'methods'             => 'GET',
-				'callback'            => [ __CLASS__, 'get_settings' ],
-				'permission_callback' => [ __CLASS__, 'check_permission' ],
-			],
-			[
-				'methods'             => 'POST',
-				'callback'            => [ __CLASS__, 'save_settings' ],
-				'permission_callback' => [ __CLASS__, 'check_permission' ],
-			],
 		] );
 
 		// Modules.
@@ -199,7 +186,7 @@ final class OneDog_BB_REST {
 
 	/*
 	|--------------------------------------------------------------------------
-	| Welcome Screen Endpoints
+	| Layouts Endpoint
 	|--------------------------------------------------------------------------
 	*/
 
@@ -213,24 +200,6 @@ final class OneDog_BB_REST {
 			'roles'     => $wp_roles->get_names(),
 			'bb_active' => $bb_active,
 		] );
-	}
-
-	public static function get_settings() {
-		$template = get_option( 'onedog_bbca_template', [] );
-		return rest_ensure_response( [ 'template' => is_array( $template ) ? $template : [] ] );
-	}
-
-	public static function save_settings( $request ) {
-		$template = $request->get_param( 'template' );
-
-		if ( ! is_array( $template ) ) {
-			return new WP_Error( 'invalid_data', __( 'Template data must be an array.', 'bb-custom-admin' ), [ 'status' => 400 ] );
-		}
-
-		$sanitized = array_map( 'sanitize_text_field', $template );
-		update_option( 'onedog_bbca_template', $sanitized );
-
-		return rest_ensure_response( [ 'success' => true, 'template' => $sanitized ] );
 	}
 
 	/*

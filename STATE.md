@@ -2,9 +2,9 @@
 
 ## Release state
 
-**`main` is at v1.3.0** as of the Dashboard Canvas & 3rd-Party Squashing implementation. Previous: v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.1** as of the Welcome Screen removal + minor version bump. Previous: v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.0 (Dashboard Canvas & 3rd-Party Squashing)
+## Current Phase: v1.3.1 (Welcome Screen Removal + Patch)
 
 ### v1.3.0 Modifications
 
@@ -72,6 +72,19 @@ Optional toggle to strip WP logos, update naggers, and footer credits for target
 - `beaver-builder-custom-admin.php` — Version bumped to 1.3.0, updated description
 - `package.json` — Version bumped to 1.3.0
 - `STATE.md` — This section
+
+**Welcome Screen module removed.** The legacy `welcome-screen` module (per-role BB welcome panel overlay via `welcome_panel` action) and its supporting files have been removed, fully superseded by the Dashboard Canvas module:
+
+**Files deleted:**
+- `includes/modules/class-welcome-screen.php` — Welcome screen module class
+- `includes/welcome-panel.php` — Panel template (BB shortcode renderer)
+- `src/components/WelcomeScreen.jsx` — React settings component (per-role template assignment UI)
+
+**Code removed:**
+- `OneDog_BBCA_Module_Loader` registry entry and metadata for `welcome-screen`
+- `GET /onedog-bbca/v1/settings` and `POST /onedog-bbca/v1/settings` REST endpoints (template read/write)
+- `WelcomeScreen` import and `welcome` tab from `App.jsx`
+- The `onedog_bbca_template` option key is no longer managed by any module; it is preserved in import/export for backward compatibility only
 
 ---
 

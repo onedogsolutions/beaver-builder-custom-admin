@@ -12,7 +12,6 @@ import apiFetch from '@wordpress/api-fetch';
 
 import RoleEditor from './RoleEditor';
 import MenuRestrictor from './MenuRestrictor';
-import WelcomeScreen from './WelcomeScreen';
 import ModuleSettings from './ModuleSettings';
 import ImportExport from './ImportExport';
 import DashboardCanvas from './DashboardCanvas';
@@ -25,10 +24,6 @@ const TABS = [
 	{
 		id: 'menus',
 		label: __( 'Menu Restrictor', 'bb-custom-admin' ),
-	},
-	{
-		id: 'welcome',
-		label: __( 'Welcome Screen', 'bb-custom-admin' ),
 	},
 	{
 		id: 'canvas',
@@ -129,7 +124,6 @@ export default function App() {
 			<div className="space-y-8">
 				{ activeTab === 'roles' && <RoleEditor showToast={ showToast } /> }
 				{ activeTab === 'menus' && <MenuRestrictor showToast={ showToast } /> }
-				{ activeTab === 'welcome' && <WelcomeScreen showToast={ showToast } /> }
 				{ activeTab === 'canvas' && <DashboardCanvas showToast={ showToast } /> }
 				{ activeTab === 'modules' && <ModuleSettings showToast={ showToast } /> }
 				{ activeTab === 'import-export' && <ImportExport showToast={ showToast } /> }
