@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.4
+Stable tag: 1.3.5
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,15 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.3.5 =
+* Fixed missing Beaver Builder styling on the dashboard canvas — most visibly, buttons rendering without their hover state. The canvas loaded the layout's own cached stylesheet but nothing else: global styles, Google Fonts and Beaver Themer assets are all registered on wp_enqueue_scripts, which never fires in wp-admin, so a button taking its colours from global styles arrived with no hover rule at all.
+* Beaver Builder's front-end asset callbacks are now replayed on the dashboard, scoped to the assigned layout. Callbacks are matched by owning class rather than by hardcoded method name, so a Beaver Builder update that renames an internal costs the canvas that one stylesheet instead of fataling.
+* Custom CSS from Beaver Builder's Global Settings is now applied to the canvas.
+* The layout's cached stylesheet is regenerated if it is missing, so the dashboard is no longer unstyled on a fresh install or after clearing the builder cache.
+* New "Theme Styles" option, off by default: loads the active theme's stylesheet on the dashboard. Needed when button colours come from the Beaver Builder Theme customizer rather than from Beaver Builder's global styles. It also restyles the admin menu, toolbar and footer, which is why it is opt-in.
+* All calls into Beaver Builder internals are individually guarded — a failure disables canvas styling and is logged under WP_DEBUG, it never takes the dashboard down.
+* New diagnostic: administrators can append ?bbca_debug_styles=1 to the dashboard or to a front-end page to list the stylesheets that page loaded. Comparing the two lists identifies anything still missing.
 
 = 1.3.4 =
 * The settings page has moved from Settings → Custom Admin to its own top-level "Custom Admin" item in the admin sidebar. As a Settings submenu it was registered last, so on a site with a normal plugin load-out it sat below the bottom of the viewport in a flyout taller than the screen and could not be reached by hover.

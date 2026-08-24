@@ -2,9 +2,45 @@
 
 ## Release state
 
-**`main` is at v1.3.4** as of the settings-page menu relocation. Previous: v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.5** as of the admin canvas styling-asset fix. Previous: v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.4 (Settings Page Menu Relocation)
+## Current Phase: v1.3.5 (Admin Canvas Styling Assets)
+
+### v1.3.5 Modifications
+
+**Fixed: Beaver Builder styling was incomplete on the dashboard canvas — most visibly, buttons rendered without their hover state.**
+
+**Root cause — the canvas loaded the layout's stylesheet and nothing else.** Since v1.3.3 `enqueue_assets()` has called `FLBuilder::register_layout_styles_scripts()` and `FLBuilder::enqueue_layout_styles_scripts()`, which between them cover the shared frontend bundle and the layout's own cached CSS/JS. On the front end a layout is styled by more than that: Global Styles (BB 2.5+), the Custom CSS from Global Settings, Google Fonts, Beaver Themer's assets, and the active theme's stylesheet. Every one of those is registered on `wp_enqueue_scripts`, or by the theme — and **`wp_enqueue_scripts` never fires in wp-admin**. Nothing in the module substituted for it.
+
+That explains why the symptom was specific to hover rather than general. A Button module with per-node colours has its `.fl-node-xxxx .fl-button:hover` rule inside the cached layout file, which the canvas already loaded, so it worked. A button inheriting its colours from Global Styles has no per-node hover rule at all — the declaration lives in the global stylesheet, which the admin document never received. Admin CSS was not overriding anything; the rule was simply absent.
+
+**Fixes applied:**
+
+1. **Front-end enqueue replay** — `replay_frontend_enqueue()` walks the registered `wp_enqueue_scripts` callbacks in priority order and invokes the ones Beaver Builder owns, inside the assigned layout's post-ID scope. This is deliberately not a list of hardcoded method names: Beaver Builder is commercial, its internals carry no versioning guarantee, and the Global Styles API in particular has moved between releases. Callbacks are matched by **owning class** (`FLBuilder*`, `FLThemeBuilder*`), so an upstream rename costs the canvas one stylesheet instead of fataling. Closures and plain functions are unattributable and are never invoked — replaying an unidentified front-end callback in wp-admin is exactly the side effect this must not introduce.
+2. **`FLBuilder::register_layout_styles_scripts()` / `enqueue_layout_styles_scripts()` are skipped during the replay**, since `enqueue_assets()` calls both directly. Without the skip list their inline CSS would be appended twice.
+3. **Global Settings Custom CSS** — `enqueue_global_settings_css()` inlines it on the canvas handle. Some Beaver Builder versions fold it into the layout cache file and some do not; when it is already there this is a duplicate of rules that print later and still win, which is harmless.
+4. **Cache-miss render** — `maybe_render_layout_css()` calls `FLBuilder::render_css()` when `get_asset_info()` reports the cache file is absent. Beaver Builder regenerates that file lazily on a front-end render, so on a fresh install, or on the first dashboard hit after someone clears the builder cache, the enqueued stylesheet was a 404 and the canvas rendered unstyled. The call is output-buffered: some versions echo the CSS as well as writing it, and `admin_enqueue_scripts` fires inside `<head>`.
+5. **Theme Styles option** (`onedog_bbca_canvas_load_theme_styles`, default off) — enqueues `get_stylesheet_uri()` and replays the theme's own front-end callbacks. On a Beaver Builder Theme site the button colours, hover included, are customizer values in the theme's generated stylesheet, so a layout leaning on them cannot be styled correctly without it. It is opt-in because theme CSS is written for a front-end document: its `body`, `a` and heading rules restyle the admin menu, toolbar and footer too. The settings UI says so, and shows a warning once the toggle is on.
+6. **`with_post_id()`** — the `set_post_id()` / `reset_post_id()` dance that v1.3.3 inlined in `enqueue_layout_assets()` is now a helper wrapping the whole block, with the pop in a `finally`. Upstream those calls are a stack, so nesting is safe.
+7. **`guard()`** — every call into Beaver Builder internals runs through it. This code executes on the dashboard, the one admin screen every user lands on; an upstream rename must cost the site its canvas styling, never its ability to log in and fix the problem. Failures are logged under `WP_DEBUG` and are otherwise silent.
+8. **`?bbca_debug_styles=1`** — administrators-only diagnostic, registered on both `admin_print_footer_scripts` and `wp_footer`, printing the request's stylesheet handles as an HTML comment. Diagnosing this class of bug means diffing the dashboard's head against a front-end render of the same layout; this makes that possible without editing code.
+
+### Verification
+
+Exercised against a stubbed WordPress + Beaver Builder harness covering: layout assigned, cache file missing, theme toggle on, full-bleed on, no layout assigned, layout deleted, and a degraded install with `FLBuilderModel` absent and no front-end callbacks registered. Confirmed in every case — replay order follows hook priority, the post-ID stack is balanced (including when a callback throws), a throwing callback is logged and the remaining sources still load, third-party and closure callbacks are never invoked, the theme pass does not re-run Beaver Builder callbacks, and `render_css()` output never escapes into the document.
+
+**Not yet verified on the target site.** Which of these sources was actually missing is a question only the live install answers — that is what `?bbca_debug_styles=1` is for. If hover is still wrong after this, the diff between the dashboard and a front-end render names the remaining source, and the Theme Styles toggle is the next thing to try.
+
+### Files Modified (v1.3.5)
+
+- `includes/modules/class-dashboard-canvas.php` — `THEME_STYLES_OPTION` and `DEBUG_STYLES_ARG` constants, `$replayed` registry, `enqueue_layout_stack()`, `replay_frontend_enqueue()`, `callback_id()`, `owns_layout_assets()`, `enqueue_global_settings_css()`, `maybe_render_layout_css()`, `enqueue_theme_styles()`, `with_post_id()`, `guard()`, `maybe_debug_styles()`; `enqueue_assets()` and `enqueue_layout_assets()` rewritten.
+- `classes/class-onedog-bb-rest.php` — `load_theme_styles` in the canvas GET/POST endpoints and in the export/import payloads.
+- `src/components/DashboardCanvas.jsx` — Theme Styles toggle card and its warning, plus the new key in both defaults objects.
+- `build/` — rebuilt.
+- `beaver-builder-custom-admin.php`, `package.json`, `readme.txt` — version 1.3.5, changelog.
+- `PLAN-1.3.5-canvas-styling-assets.md` — the plan this implements.
+
+## Historical Phase: v1.3.4 (Settings Page Menu Relocation)
 
 ### v1.3.4 Modifications
 

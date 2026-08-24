@@ -1,6 +1,9 @@
 # Plan — v1.3.5: Load Beaver Builder Styling Assets in the Admin Canvas
 
-**Status:** proposed
+**Status:** implemented in v1.3.5 — see `STATE.md`. Steps 1–8 shipped; Step 0 (the on-site stylesheet
+diff) is now available as `?bbca_debug_styles=1` and still wants running on the target site to confirm which
+source was actually missing. Step 7's speculative admin-CSS overrides were deliberately **not** written: the
+hover rule turned out to be absent rather than overridden, so there was nothing to out-specify.
 **Scope:** `OneDog_BBCA_Dashboard_Canvas` asset loading, `assets/css/admin-canvas.css`, one new opt-in setting
 **Symptom that prompted it:** button hover CSS (and other layout styling) does not load on the dashboard canvas in wp-admin.
 
