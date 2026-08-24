@@ -511,7 +511,6 @@ final class OneDog_BB_REST {
 			'menu_rules' => get_option( 'onedog_bbca_menu_visibility', [] ),
 			'toolbar_rules' => get_option( 'onedog_bbca_toolbar_visibility', [] ),
 			'modules' => get_option( 'onedog_bbca_modules', [] ),
-			'templates' => get_option( 'onedog_bbca_template', [] ),
 			'notice_cleaner' => get_option( 'onedog_bbca_notice_cleaner', [] ),
 			'canvas_layout_id' => absint( get_option( 'onedog_bbca_canvas_layout_id', 0 ) ),
 			'canvas_target_roles' => (array) get_option( 'onedog_bbca_canvas_target_roles', [] ),
@@ -555,11 +554,6 @@ final class OneDog_BB_REST {
 		// Import modules.
 		if ( isset( $config['modules'] ) && is_array( $config['modules'] ) ) {
 			update_option( 'onedog_bbca_modules', array_map( 'sanitize_text_field', $config['modules'] ) );
-		}
-
-		// Import templates.
-		if ( isset( $config['templates'] ) && is_array( $config['templates'] ) ) {
-			update_option( 'onedog_bbca_template', array_map( 'sanitize_text_field', $config['templates'] ) );
 		}
 
 		// Import notice cleaner settings.

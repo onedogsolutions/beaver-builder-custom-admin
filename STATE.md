@@ -84,7 +84,7 @@ Optional toggle to strip WP logos, update naggers, and footer credits for target
 - `OneDog_BBCA_Module_Loader` registry entry and metadata for `welcome-screen`
 - `GET /onedog-bbca/v1/settings` and `POST /onedog-bbca/v1/settings` REST endpoints (template read/write)
 - `WelcomeScreen` import and `welcome` tab from `App.jsx`
-- The `onedog_bbca_template` option key is no longer managed by any module; it is preserved in import/export for backward compatibility only
+- The `onedog_bbca_template` option key is no longer managed, exported, or imported by any module.
 
 ---
 

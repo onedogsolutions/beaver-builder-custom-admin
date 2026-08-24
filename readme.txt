@@ -1,18 +1,18 @@
 === Beaver Builder Custom Admin ===
 Contributors: rwaterbury, onedogsolutions
-Tags: beaver builder, dashboard, welcome panel, admin, custom
+Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.1
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Replaces the default WordPress dashboard welcome panel with a custom Beaver Builder template, selectable per user role.
+Replaces the default WordPress dashboard with a full-bleed Beaver Builder canvas for selected user roles.
 
 == Description ==
 
-Beaver Builder Custom Admin gives you full control over the WordPress dashboard welcome panel using Beaver Builder. Personalize the dashboard with content and design built with Beaver Builder — headings, contact information, forms, video, images, affiliate links, and more.
+Beaver Builder Custom Admin gives you full control over the WordPress dashboard using Beaver Builder. Replace the entire dashboard with a full-bleed canvas built with Beaver Builder — headings, contact information, forms, video, images, affiliate links, and more.
 
 Display a different template for each user role.
 
@@ -22,7 +22,7 @@ Display a different template for each user role.
 2. Go to Settings → Custom Admin and select the layout for any user role.
 3. Save. Done!
 
-**Migration:** This plugin replaces "Dashboard Welcome for Beaver Builder" (bb-dashboard-welcome). On activation it automatically migrates your existing settings and deactivates the legacy plugin.
+**Legacy plugin:** This plugin replaces "Dashboard Welcome for Beaver Builder" (bb-dashboard-welcome). On activation it automatically deactivates the legacy plugin.
 
 **Disclaimer:** This is an independent plugin and is not affiliated with, endorsed by, or sponsored by Beaver Builder or FastLine Media. "Beaver Builder" is a trademark of FastLine Media, Inc.
 
@@ -30,8 +30,8 @@ Display a different template for each user role.
 
 1. Install Beaver Builder Custom Admin either via the WordPress plugin directory or by uploading the files to `/wp-content/plugins/`.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
-3. If the legacy "Dashboard Welcome for Beaver Builder" plugin is active, it will be deactivated automatically and its settings migrated.
-4. Navigate to Settings → Custom Admin to configure your dashboard panels.
+3. If the legacy "Dashboard Welcome for Beaver Builder" plugin is active, it will be deactivated automatically.
+4. Navigate to Settings → Custom Admin to configure your dashboard canvas.
 
 == Requirements ==
 
@@ -46,7 +46,7 @@ No. All configuration is done through the Settings → Custom Admin page.
 
 = What happens to my old settings? =
 
-On activation, settings from "Dashboard Welcome for Beaver Builder" are migrated automatically. The old plugin is deactivated.
+On activation, the legacy "Dashboard Welcome for Beaver Builder" plugin is deactivated automatically. Settings from the legacy plugin are not migrated because the welcome-panel feature has been replaced by the Dashboard Canvas.
 
 = Does this work without Beaver Builder? =
 
@@ -56,7 +56,7 @@ The settings page will load, but no layouts will be available. Beaver Builder mu
 
 This plugin:
 
-* Stores a role-to-template mapping in the WordPress options table (`onedog_bbca_template`).
+* Stores dashboard canvas settings in the WordPress options table.
 * Does not collect, transmit, or store any personal data.
 * Does not set cookies.
 * Does not make external HTTP requests.
@@ -65,6 +65,16 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.3.1 =
+* Removed remaining Dashboard Welcome references and dead welcome-panel assets.
+* Stopped enqueuing unused frontend.css/frontend.js files.
+* Updated readme and settings page copy to describe the Dashboard Canvas.
+
+= 1.3.0 =
+* New module: Dashboard Canvas — full-bleed Beaver Builder dashboard replacement.
+* Removed the legacy welcome-screen module and its supporting files.
+* Added 3rd-party injection squashing and WordPress branding removal options.
 
 = 1.2.0 =
 * Removed the Orphaned Option Cleaner module — the feature has been ported to a dedicated standalone plugin.

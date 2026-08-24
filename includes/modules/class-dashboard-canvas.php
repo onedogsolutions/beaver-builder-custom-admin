@@ -86,7 +86,7 @@ final class OneDog_BBCA_Dashboard_Canvas {
 			return;
 		}
 
-		// 1. Kill native Welcome Panel.
+		// 1. Remove native Welcome Panel.
 		remove_action( 'welcome_panel', 'wp_welcome_panel' );
 
 		// 2. Wipe standard core and 3rd-party dashboard widgets.
@@ -171,26 +171,6 @@ final class OneDog_BBCA_Dashboard_Canvas {
 			BBCA_URL . 'assets/css/admin-canvas.css',
 			[],
 			BBCA_VER
-		);
-
-		// Existing frontend styles (BB content resets).
-		wp_enqueue_style(
-			'onedog-bbca-frontend',
-			BBCA_URL . 'assets/css/frontend.css',
-			[],
-			BBCA_VER
-		);
-
-		// Frontend JS (panel repositioning helper).
-		wp_enqueue_script(
-			'onedog-bbca-frontend',
-			BBCA_URL . 'assets/js/frontend.js',
-			[],
-			BBCA_VER,
-			[
-				'strategy'  => 'defer',
-				'in_footer' => true,
-			]
 		);
 
 		// Beaver Builder layout styles and scripts.

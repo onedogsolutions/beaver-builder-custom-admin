@@ -18,7 +18,6 @@ body.index-php #wpbody-content {
 body.index-php #wpbody-content > div:not(#bbca-custom-dashboard-canvas),
 body.index-php #screen-meta-links,
 body.index-php #screen-meta,
-body.index-php #welcome-panel,
 body.index-php #wpbody-content > .wrap {
 	display: none !important;
 }

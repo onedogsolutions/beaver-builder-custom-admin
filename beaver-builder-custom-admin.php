@@ -27,24 +27,15 @@ define( 'BBCA_PATH', plugin_basename( __FILE__ ) );
  * The legacy plugin this replaces.
  */
 define( 'BBCA_LEGACY_PLUGIN', 'bb-dashboard-welcome/bb-dashboard-welcome.php' );
-define( 'BBCA_LEGACY_OPTION', 'bbpd_template' );
 
 /**
- * Activation hook: migrate legacy settings and deactivate the old plugin.
+ * Activation hook: deactivate the legacy plugin if it is still active.
  *
  * @since 0.1.0
  * @package OneDog\BBCustomAdmin
  * @return void
  */
 function onedog_bbca_activate() {
-	$legacy = get_option( BBCA_LEGACY_OPTION );
-	$new    = get_option( 'onedog_bbca_template' );
-
-	if ( false !== $legacy && false === $new ) {
-		update_option( 'onedog_bbca_template', $legacy );
-		delete_option( BBCA_LEGACY_OPTION );
-	}
-
 	if ( is_plugin_active( BBCA_LEGACY_PLUGIN ) ) {
 		deactivate_plugins( BBCA_LEGACY_PLUGIN );
 	}

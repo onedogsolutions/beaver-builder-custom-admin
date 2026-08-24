@@ -94,7 +94,7 @@ export default function App() {
 					</h1>
 					<p className="mt-1 text-sm text-gray-500">
 						{ __(
-							'Modular WordPress admin customization — roles, menus, welcome templates, and more.',
+							'Modular WordPress admin customization — roles, menus, dashboard canvas, and more.',
 							'bb-custom-admin'
 						) }
 					</p>
