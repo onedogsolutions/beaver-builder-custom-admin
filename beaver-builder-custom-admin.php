@@ -4,7 +4,7 @@
  * Description: Modular WordPress admin customization — full-bleed dashboard canvas, role/menu/toolbar visibility, notice cleaner, and 3rd-party squashing by user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
- * Version: 1.3.5
+ * Version: 1.3.6
  * Requires at least: 5.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '1.3.5' );
+define( 'BBCA_VER', '1.3.6' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );
@@ -50,41 +50,41 @@ register_activation_hook( __FILE__, 'onedog_bbca_activate' );
 define( 'BBCA_MENU_SLUG', 'onedog-bbca-settings' );
 
 /**
- * Registers the settings page as a top-level admin menu item.
+ * Registers the settings page as a Settings submenu item.
  *
- * Was a Settings submenu until 1.3.4. On a site with a normal plugin
- * load-out the Settings flyout is taller than the viewport, and because
- * add_options_page() appends, this page was the last entry in it - below
- * the fold and unreachable by hover. A top-level item does not depend on
- * flyout height or on where the parent sits in the sidebar.
+ * Lives under Settings. It was a top-level item for 1.3.4-1.3.5, after
+ * the Settings flyout on a heavily-loaded site grew taller than the
+ * viewport and put this page - registered last, so at the bottom of the
+ * flyout - out of hover reach. It is registered here on `admin_menu` at
+ * priority 9 instead of 25 so it lands ahead of the plugins that use the
+ * default priority, rather than at the end of the flyout again.
  *
  * @since 0.2.0
  * @return void
  */
 function onedog_bbca_admin_menu() {
-	add_menu_page(
+	add_options_page(
 		__( 'Custom Admin', 'bb-custom-admin' ),
 		__( 'Custom Admin', 'bb-custom-admin' ),
 		'manage_options',
 		BBCA_MENU_SLUG,
-		'onedog_bbca_render_settings_page',
-		'dashicons-admin-customizer',
-		80.7
+		'onedog_bbca_render_settings_page'
 	);
 }
-add_action( 'admin_menu', 'onedog_bbca_admin_menu', 25 );
+add_action( 'admin_menu', 'onedog_bbca_admin_menu', 9 );
 
 /**
- * Redirects the pre-1.3.4 Settings submenu URL to the top-level page.
+ * Redirects the 1.3.4-1.3.5 top-level URL to the Settings submenu.
  *
- * Keeps existing bookmarks and any stored Menu Restrictor rules that
- * still point at options-general.php working.
+ * Mirrors the redirect 1.3.4 added in the other direction. Keeps
+ * bookmarks made while the page was top-level, and any Menu Restrictor
+ * rules stored against `admin.php`, working.
  *
- * @since 1.3.4
+ * @since 1.3.6
  * @return void
  */
 function onedog_bbca_redirect_legacy_settings_url() {
-	if ( 'options-general.php' !== ( $GLOBALS['pagenow'] ?? '' ) ) {
+	if ( 'admin.php' !== ( $GLOBALS['pagenow'] ?? '' ) ) {
 		return;
 	}
 
@@ -94,7 +94,7 @@ function onedog_bbca_redirect_legacy_settings_url() {
 		return;
 	}
 
-	wp_safe_redirect( admin_url( 'admin.php?page=' . BBCA_MENU_SLUG ) );
+	wp_safe_redirect( admin_url( 'options-general.php?page=' . BBCA_MENU_SLUG ) );
 	exit;
 }
 add_action( 'admin_init', 'onedog_bbca_redirect_legacy_settings_url' );
@@ -117,12 +117,12 @@ function onedog_bbca_render_settings_page() {
  * @return void
  */
 function onedog_bbca_enqueue_settings_assets( $hook_suffix ) {
-	// 'toplevel_page_*' since 1.3.4; 'settings_page_*' is the pre-1.3.4
-	// hook suffix, kept so the page still loads its assets if anything
-	// re-parents it under Settings.
+	// 'settings_page_*' is the hook suffix for a Settings submenu page.
+	// 'toplevel_page_*' was the suffix while the page was top-level
+	// (1.3.4-1.3.5), kept so assets still load if anything re-parents it.
 	$hooks = [
-		'toplevel_page_' . BBCA_MENU_SLUG,
 		'settings_page_' . BBCA_MENU_SLUG,
+		'toplevel_page_' . BBCA_MENU_SLUG,
 	];
 
 	if ( ! in_array( $hook_suffix, $hooks, true ) ) {

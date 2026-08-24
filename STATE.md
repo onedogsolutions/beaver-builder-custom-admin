@@ -2,9 +2,49 @@
 
 ## Release state
 
-**`main` is at v1.3.5** as of the admin canvas styling-asset fix. Previous: v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.6** as of the settings-page return to the Settings menu. Previous: v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.5 (Admin Canvas Styling Assets)
+## Current Phase: v1.3.6 (Settings Page Returned to the Settings Menu)
+
+### v1.3.6 Modifications
+
+**Requested: put the settings page back under Settings, where it lived until v1.3.4.**
+
+v1.3.4 moved it out to a top-level "Custom Admin" sidebar item because on the target site it could not be reached: `add_options_page()` appends, the page was registered at `admin_menu` priority 25 so it was the last entry in the Settings submenu, and that submenu is taller than the viewport on a site carrying a normal plugin load-out. The flyout ran off the bottom of the screen and the final entries — this one among them — were not hoverable. Reverting the parent alone would reproduce that exactly, so the position within the submenu is part of this change.
+
+**Changes applied:**
+
+1. **Back to a Settings submenu** — `add_options_page()` in place of `add_menu_page()`. The dashicon and the `80.7` position argument go with it; a submenu item has neither.
+2. **Registered at `admin_menu` priority 9, not 25** — this is the part that keeps 1.3.4's bug from coming back. Core builds its own menus before `admin_menu` fires, and plugins overwhelmingly register on the default priority 10, so priority 9 lands this page immediately after core's Settings entries and ahead of the plugin block instead of at the end of it. Reachability no longer depends on how many other plugins have claimed the Settings menu, only on the flyout's first screenful — which core's own entries already fit inside.
+3. **Redirect reversed** — `onedog_bbca_redirect_legacy_settings_url()` now sends `admin.php?page=onedog-bbca-settings` to `options-general.php?page=onedog-bbca-settings`. It is the mirror of the 1.3.4 redirect, and it matters more than the original did: while the page was top-level, `admin.php` was the URL the settings page itself linked to and the one anyone would have bookmarked, and without the redirect that URL is a "Sorry, you are not allowed to access this page" screen rather than a 404. Any Menu Restrictor rule stored against the top-level slug follows the same path.
+4. **Asset enqueue hook suffix** — `settings_page_onedog-bbca-settings` is matched first again, with `toplevel_page_*` kept as the fallback. Both suffixes stay in the list, so the page renders its React app whichever parent it ends up under.
+
+**Trade-off, recorded deliberately:** the failure mode 1.3.4 was written to fix is a property of the Settings menu, not of this plugin, and priority 9 mitigates it rather than removing it. If a future plugin also registers ahead of the default block and pushes this entry down, or if a site's Settings menu grows past a screenful of core entries alone, the flyout can clip it again. The top-level registration is one line away in git history, and the enqueue guard still accepts that hook suffix.
+
+### Verification
+
+`php -l` clean. Traced by hand against core's menu construction: `add_options_page()` at priority 9 appends to `$submenu['options-general.php']` after the core entries registered in `wp-admin/menu.php` (which runs before `admin_menu` fires) and before anything registered at priority 10 or later; the resulting hook suffix is `settings_page_onedog-bbca-settings`, which the enqueue guard matches. The redirect cannot loop — it fires only when `$pagenow` is `admin.php` and targets `options-general.php`, where the guard returns early.
+
+**Not yet verified on the target site.** The one thing worth checking there is position: whether "Custom Admin" lands high enough in the Settings flyout to be hoverable on that install's plugin load-out. That is the whole risk of this release.
+
+### Files Modified (v1.3.6)
+
+- `beaver-builder-custom-admin.php` — `onedog_bbca_admin_menu()` uses `add_options_page()` on `admin_menu` priority 9; `onedog_bbca_redirect_legacy_settings_url()` reversed to send `admin.php` to `options-general.php`; enqueue hook-suffix order and comment; version `1.3.6`.
+- `package.json` — Version `1.3.6`.
+- `readme.txt` — Stable tag, changelog, upgrade notice. The Description, Installation and FAQ copy already said "Settings → Custom Admin" and is accurate again without edits.
+- `STATE.md` — This section.
+
+`build/` is unchanged — this release touches no JavaScript, and no settings-UI copy names the menu location.
+
+### Release
+
+Merged to `main` and packaged for testing: `dist/beaver-builder-custom-admin-1.3.6.zip`.
+
+**Testing this build.** Install the zip, then confirm in order: "Custom Admin" appears in the Settings flyout and sits high enough in it to click without the list scrolling off-screen; it opens the React settings app with all tabs intact; `admin.php?page=onedog-bbca-settings` redirects to `options-general.php?page=onedog-bbca-settings` rather than showing a permissions error; and the settings page still loads its CSS and JS (an unstyled or empty page means the hook-suffix match is wrong).
+
+---
+
+## Historical Phase: v1.3.5 (Admin Canvas Styling Assets)
 
 ### v1.3.5 Modifications
 

@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.5
+Stable tag: 1.3.6
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,11 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.3.6 =
+* The settings page has moved back to Settings → Custom Admin. It was a top-level "Custom Admin" sidebar item in 1.3.4 and 1.3.5.
+* It is now registered earlier than most plugins' Settings pages, so it appears near the top of the Settings submenu rather than at the end — that end position, in a flyout taller than the screen, is what made it unreachable before 1.3.4.
+* The 1.3.4-1.3.5 admin.php?page=onedog-bbca-settings URL now redirects to options-general.php?page=onedog-bbca-settings, so bookmarks made while the page was top-level keep working.
 
 = 1.3.5 =
 * Fixed missing Beaver Builder styling on the dashboard canvas — most visibly, buttons rendering without their hover state. The canvas loaded the layout's own cached stylesheet but nothing else: global styles, Google Fonts and Beaver Themer assets are all registered on wp_enqueue_scripts, which never fires in wp-admin, so a button taking its colours from global styles arrived with no hover rule at all.
@@ -144,6 +149,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.3.6 =
+The settings page returns to Settings → Custom Admin, registered near the top of the Settings submenu. Bookmarks to the 1.3.4-1.3.5 top-level URL redirect.
 
 = 1.3.4 =
 The settings page is now a top-level "Custom Admin" item in the admin sidebar instead of a Settings submenu, which was unreachable on sites where the Settings flyout runs past the bottom of the screen. Old URLs redirect.
