@@ -162,6 +162,12 @@ final class OneDog_BB_REST {
 			'callback'            => [ __CLASS__, 'import_config' ],
 			'permission_callback' => [ __CLASS__, 'check_permission' ],
 		] );
+
+		register_rest_route( self::NAMESPACE, '/import-ure', [
+			'methods'             => 'POST',
+			'callback'            => [ __CLASS__, 'import_ure_config' ],
+			'permission_callback' => [ __CLASS__, 'check_permission' ],
+		] );
 	}
 
 	/**
@@ -534,8 +540,6 @@ final class OneDog_BB_REST {
 	}
 
 	public static function import_config( $request ) {
-		global $wp_roles;
-
 		$config = $request->get_json_params();
 
 		if ( empty( $config ) || ! is_array( $config ) ) {
@@ -544,35 +548,7 @@ final class OneDog_BB_REST {
 
 		// Import roles.
 		if ( isset( $config['roles'] ) && is_array( $config['roles'] ) ) {
-			foreach ( $config['roles'] as $slug => $role_data ) {
-				$slug = sanitize_key( $slug );
-				$name = sanitize_text_field( $role_data['name'] ?? $slug );
-				$caps = isset( $role_data['capabilities'] ) && is_array( $role_data['capabilities'] )
-					? $role_data['capabilities']
-					: [];
-
-				$existing = get_role( $slug );
-				if ( $existing ) {
-					// Update existing role.
-					foreach ( array_keys( $existing->capabilities ) as $cap ) {
-						$existing->remove_cap( $cap );
-					}
-					foreach ( $caps as $cap => $granted ) {
-						if ( $granted ) {
-							$existing->add_cap( sanitize_key( $cap ) );
-						}
-					}
-				} else {
-					// Create new role.
-					$sanitized_caps = [];
-					foreach ( $caps as $cap => $granted ) {
-						if ( $granted ) {
-							$sanitized_caps[ sanitize_key( $cap ) ] = true;
-						}
-					}
-					add_role( $slug, $name, $sanitized_caps );
-				}
-			}
+			self::apply_roles( $config['roles'] );
 		}
 
 		// Import menu rules.
@@ -601,6 +577,222 @@ final class OneDog_BB_REST {
 		}
 
 		return rest_ensure_response( [ 'success' => true ] );
+	}
+
+	/**
+	 * Imports roles from a User Role Editor (Pro) export file.
+	 *
+	 * Expects the raw file contents posted as `content`.
+	 *
+	 * @since 1.3.0
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function import_ure_config( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Role_Editor' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Role Editor module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$content = trim( (string) $request->get_param( 'content' ) );
+
+		if ( '' === $content ) {
+			return new WP_Error( 'invalid_data', __( 'No import data received.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$roles = self::parse_ure_export( $content );
+
+		if ( is_wp_error( $roles ) ) {
+			return $roles;
+		}
+
+		$result = self::apply_roles( $roles );
+
+		return rest_ensure_response( [
+			'success'  => true,
+			'imported' => $result['imported'],
+			'skipped'  => $result['skipped'],
+		] );
+	}
+
+	/**
+	 * Parses a User Role Editor (Pro) export file into a roles array.
+	 *
+	 * URE Pro exports are base64-encoded JSON with base64-encoded role
+	 * names: { "roles": { slug: { name, capabilities } }, "addons": ... }.
+	 * Plain (non base64-wrapped) JSON exports are also accepted. URE Pro
+	 * addon data (admin menu access, etc.) is intentionally ignored.
+	 *
+	 * @since 1.3.0
+	 * @param string $content Raw file contents.
+	 * @return array|WP_Error Roles shaped as slug => [ name, capabilities ].
+	 */
+	private static function parse_ure_export( $content ) {
+		$decoded = base64_decode( $content, true );
+
+		$data = null;
+		if ( false !== $decoded ) {
+			$data = json_decode( trim( $decoded ), true );
+		}
+		if ( ! is_array( $data ) ) {
+			$data = json_decode( $content, true );
+		}
+
+		if ( ! is_array( $data ) || empty( $data['roles'] ) || ! is_array( $data['roles'] ) ) {
+			return new WP_Error(
+				'invalid_format',
+				__( 'Unrecognized file format. Expected a User Role Editor export (.dat) file.', 'bb-custom-admin' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		$roles = [];
+
+		foreach ( $data['roles'] as $slug => $role_data ) {
+			if ( ! is_array( $role_data ) ) {
+				continue;
+			}
+
+			$slug = self::sanitize_role_slug( (string) $slug );
+
+			if ( '' === $slug ) {
+				continue;
+			}
+
+			$name = sanitize_text_field( self::maybe_base64_decode( $role_data['name'] ?? $slug ) );
+
+			$caps = [];
+			if ( isset( $role_data['capabilities'] ) && is_array( $role_data['capabilities'] ) ) {
+				foreach ( $role_data['capabilities'] as $cap => $granted ) {
+					$cap = self::sanitize_cap( (string) $cap );
+					if ( '' !== $cap ) {
+						$caps[ $cap ] = filter_var( $granted, FILTER_VALIDATE_BOOLEAN );
+					}
+				}
+			}
+
+			$roles[ $slug ] = [
+				'name'         => '' !== $name ? $name : $slug,
+				'capabilities' => $caps,
+			];
+		}
+
+		if ( empty( $roles ) ) {
+			return new WP_Error(
+				'no_roles',
+				__( 'No valid roles found in the import file.', 'bb-custom-admin' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		return $roles;
+	}
+
+	/**
+	 * Applies an imported roles map to WordPress.
+	 *
+	 * Existing roles have their capabilities replaced; missing roles are
+	 * created. The administrator role is always protected.
+	 *
+	 * @since 1.3.0
+	 * @param array $roles Roles shaped as slug => [ name, capabilities ].
+	 * @return array { imported: string[], skipped: array[] }
+	 */
+	private static function apply_roles( $roles ) {
+		$imported = [];
+		$skipped  = [];
+
+		foreach ( $roles as $slug => $role_data ) {
+			$slug = self::sanitize_role_slug( (string) $slug );
+
+			if ( '' === $slug ) {
+				continue;
+			}
+
+			// Protect the administrator role from bulk imports.
+			if ( 'administrator' === $slug ) {
+				$skipped[] = [
+					'role'   => $slug,
+					'reason' => __( 'The administrator role is protected and was skipped.', 'bb-custom-admin' ),
+				];
+				continue;
+			}
+
+			$name = sanitize_text_field( $role_data['name'] ?? $slug );
+			$caps = isset( $role_data['capabilities'] ) && is_array( $role_data['capabilities'] )
+				? $role_data['capabilities']
+				: [];
+
+			$existing = get_role( $slug );
+			if ( $existing ) {
+				// Update existing role.
+				foreach ( array_keys( $existing->capabilities ) as $cap ) {
+					$existing->remove_cap( $cap );
+				}
+				foreach ( $caps as $cap => $granted ) {
+					if ( $granted ) {
+						$existing->add_cap( self::sanitize_cap( (string) $cap ) );
+					}
+				}
+			} else {
+				// Create new role.
+				$sanitized_caps = [];
+				foreach ( $caps as $cap => $granted ) {
+					if ( $granted ) {
+						$sanitized_caps[ self::sanitize_cap( (string) $cap ) ] = true;
+					}
+				}
+				add_role( $slug, '' !== $name ? $name : $slug, $sanitized_caps );
+			}
+
+			$imported[] = $slug;
+		}
+
+		return [
+			'imported' => $imported,
+			'skipped'  => $skipped,
+		];
+	}
+
+	/**
+	 * Decodes a value that may be base64-encoded (URE Pro role names).
+	 *
+	 * @since 1.3.0
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	private static function maybe_base64_decode( $value ) {
+		if ( ! is_string( $value ) || '' === trim( $value ) ) {
+			return '';
+		}
+
+		$decoded = base64_decode( trim( $value ), true );
+
+		return false !== $decoded ? $decoded : $value;
+	}
+
+	/**
+	 * Sanitizes a role slug (lowercase letters, digits, underscores, hyphens).
+	 *
+	 * Note: sanitize_key() strips hyphens, but roles and capabilities from
+	 * other plugins can contain them.
+	 *
+	 * @since 1.3.0
+	 * @param string $slug Raw slug.
+	 * @return string
+	 */
+	private static function sanitize_role_slug( $slug ) {
+		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $slug ) );
+	}
+
+	/**
+	 * Sanitizes a capability name.
+	 *
+	 * @since 1.3.0
+	 * @param string $cap Raw capability.
+	 * @return string
+	 */
+	private static function sanitize_cap( $cap ) {
+		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $cap ) );
 	}
 }
 
