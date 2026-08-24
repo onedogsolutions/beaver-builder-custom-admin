@@ -48,6 +48,22 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	const BRANDING_OPTION = 'onedog_bbca_canvas_hide_wp_branding';
 
 	/**
+	 * Option key for the full-bleed rows toggle.
+	 *
+	 * @since 1.3.3
+	 * @var string
+	 */
+	const FULL_BLEED_OPTION = 'onedog_bbca_canvas_full_bleed_rows';
+
+	/**
+	 * Body class marking the canvas as active for the current request.
+	 *
+	 * @since 1.3.3
+	 * @var string
+	 */
+	const BODY_CLASS = 'bbca-canvas-active';
+
+	/**
 	 * Output-buffer nesting level when notice suppression starts.
 	 *
 	 * @var int|false
@@ -86,6 +102,10 @@ final class OneDog_BBCA_Dashboard_Canvas {
 			return;
 		}
 
+		// 0. Mark the request so canvas CSS can scope to the feature
+		// rather than to the dashboard screen.
+		add_filter( 'admin_body_class', [ __CLASS__, 'add_body_class' ] );
+
 		// 1. Remove native Welcome Panel.
 		remove_action( 'welcome_panel', 'wp_welcome_panel' );
 
@@ -109,6 +129,20 @@ final class OneDog_BBCA_Dashboard_Canvas {
 		if ( get_option( self::BRANDING_OPTION, false ) ) {
 			self::setup_branding_removal();
 		}
+	}
+
+	/**
+	 * Adds the canvas body class.
+	 *
+	 * Only runs when the canvas is active for the current user, so the
+	 * class is a reliable signal for CSS scoping.
+	 *
+	 * @since 1.3.3
+	 * @param string $classes Space-separated admin body classes.
+	 * @return string
+	 */
+	public static function add_body_class( $classes ) {
+		return trim( $classes . ' ' . self::BODY_CLASS );
 	}
 
 	/**
@@ -163,21 +197,80 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	/**
 	 * Enqueues canvas CSS and Beaver Builder layout assets on index.php.
 	 *
+	 * Runs on `admin_enqueue_scripts`, which fires before
+	 * `admin_print_styles` — so everything registered here reaches the
+	 * document head. The canvas markup is rendered much later, on
+	 * `all_admin_notices`, which is well past the point where a
+	 * stylesheet can still make it into <head>.
+	 *
 	 * @since 1.3.0
 	 * @return void
 	 */
 	public static function enqueue_assets() {
-		// Canvas full-bleed styles.
-		wp_enqueue_style(
-			'onedog-bbca-canvas',
-			BBCA_URL . 'assets/css/admin-canvas.css',
-			[],
-			BBCA_VER
-		);
+		$css_rel  = 'assets/css/admin-canvas.css';
+		$css_path = BBCA_DIR . $css_rel;
 
-		// Beaver Builder layout styles and scripts.
-		if ( class_exists( 'FLBuilder' ) ) {
-			FLBuilder::register_layout_styles_scripts();
+		// Version by file mtime so stylesheet edits bust caches even when
+		// the plugin version is unchanged.
+		$css_ver = file_exists( $css_path ) ? (string) filemtime( $css_path ) : BBCA_VER;
+
+		wp_enqueue_style( 'onedog-bbca-canvas', BBCA_URL . $css_rel, [], $css_ver );
+
+		// Optional: let rows fill the admin column instead of honouring
+		// Beaver Builder's global fixed row width.
+		if ( get_option( self::FULL_BLEED_OPTION, false ) ) {
+			wp_add_inline_style(
+				'onedog-bbca-canvas',
+				'#bbca-custom-dashboard-canvas .fl-row-fixed-width { max-width: 100%; }'
+			);
+		}
+
+		if ( ! class_exists( 'FLBuilder' ) ) {
+			return;
+		}
+
+		// Core Beaver Builder layout styles and scripts.
+		FLBuilder::register_layout_styles_scripts();
+
+		// The assigned layout's own cached CSS/JS. Without this, the
+		// layout stylesheet is first enqueued by FLBuilderShortcode during
+		// render_canvas() and is deferred to the footer, so the layout's
+		// row and column width rules are missing on first paint.
+		$layout_id = absint( get_option( self::LAYOUT_OPTION, 0 ) );
+
+		if ( $layout_id && get_post( $layout_id ) ) {
+			self::enqueue_layout_assets( $layout_id );
+		}
+	}
+
+	/**
+	 * Enqueues the cached assets for a single Beaver Builder layout.
+	 *
+	 * Beaver Builder resolves the layout from its own post-ID state, and
+	 * the signature of enqueue_layout_styles_scripts() has varied across
+	 * versions, so the post ID is set explicitly and restored afterwards.
+	 *
+	 * @since 1.3.3
+	 * @param int $layout_id Post ID of the Beaver Builder layout.
+	 * @return void
+	 */
+	private static function enqueue_layout_assets( $layout_id ) {
+		if ( ! method_exists( 'FLBuilder', 'enqueue_layout_styles_scripts' ) ) {
+			return;
+		}
+
+		$scoped = class_exists( 'FLBuilderModel' )
+			&& method_exists( 'FLBuilderModel', 'set_post_id' )
+			&& method_exists( 'FLBuilderModel', 'reset_post_id' );
+
+		if ( $scoped ) {
+			FLBuilderModel::set_post_id( $layout_id );
+		}
+
+		FLBuilder::enqueue_layout_styles_scripts( $layout_id );
+
+		if ( $scoped ) {
+			FLBuilderModel::reset_post_id();
 		}
 	}
 
@@ -241,8 +334,8 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	 */
 	public static function squash_notice_css() {
 		echo '<style id="onedog-bbca-squash-notices">'
-			. 'body.index-php .notice, body.index-php .update-nag, '
-			. 'body.index-php .error, body.index-php .updated { '
+			. 'body.bbca-canvas-active .notice, body.bbca-canvas-active .update-nag, '
+			. 'body.bbca-canvas-active .error, body.bbca-canvas-active .updated { '
 			. 'display: none !important; }</style>';
 	}
 
@@ -325,9 +418,9 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	 */
 	public static function hide_branding_css() {
 		echo '<style id="onedog-bbca-hide-branding">'
-			. 'body.index-php #wp-admin-bar-wp-logo, '
-			. 'body.index-php .update-nag, '
-			. 'body.index-php #footer-upgrade { '
+			. 'body.bbca-canvas-active #wp-admin-bar-wp-logo, '
+			. 'body.bbca-canvas-active .update-nag, '
+			. 'body.bbca-canvas-active #footer-upgrade { '
 			. 'display: none !important; }</style>';
 	}
 

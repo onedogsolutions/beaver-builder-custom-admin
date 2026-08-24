@@ -2,9 +2,74 @@
 
 ## Release state
 
-**`main` is at v1.3.2** as of the Dashboard Canvas layout fix. Previous: v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.3** as of the Dashboard Canvas admin-menu overlap fix. Previous: v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.2 (Dashboard Canvas Layout Fix)
+## Current Phase: v1.3.3 (Dashboard Canvas Admin-Menu Overlap Fix)
+
+### v1.3.3 Modifications
+
+**Fixed the Dashboard Canvas overlapping the WordPress admin menu.**
+
+**Root cause — the full-bleed margin was mis-targeted.** `assets/css/admin-canvas.css` carried `margin: -20px -20px 0 -20px` on `#bbca-custom-dashboard-canvas`, commented as countering "default `#wpbody-content` padding." That padding does not exist. WordPress core sets:
+
+```css
+#wpcontent      { margin-left: 160px; padding-left: 20px; }   /* the only horizontal gutter */
+#wpbody-content { padding-bottom: 65px; float: left; width: 100%; }  /* no horizontal padding */
+```
+
+So the left `-20px` pulled the canvas out of the content column and onto the admin menu strip, and the right `-20px` had no padding to consume and simply extended the canvas 20px past the viewport — putting the whole admin document into horizontal overflow.
+
+**Why that reads as "covering the menu."** Core paints the menu in two pieces with different scroll behaviour: `#adminmenuback` (the dark strip) is `position: fixed; z-index: 1` and never scrolls, while `#adminmenuwrap` (the clickable list) is `position: relative; float: left; z-index: 9990` and is in normal flow. Under horizontal overflow the menu items slide out from under their own background. Beaver Builder compounds it — `.fl-row-bg-overlay .fl-row-content` ships `position: relative; z-index: 1`, which ties `#adminmenuback` and wins on DOM order.
+
+**Why removing the margin in `3244e88` appeared to change nothing.** That commit touched only the CSS file. The stylesheet is cache-busted with `BBCA_VER`, which `8b21b2c` had already set to `1.3.2`, so `admin-canvas.css?ver=1.3.2` kept resolving to the cached copy containing the negative margin — in the browser and in LiteSpeed Cache's optimized CSS.
+
+**Fixes applied:**
+
+1. **Cache-busting** — `enqueue_assets()` now versions the canvas stylesheet with `filemtime()`, so CSS edits bust caches without a version bump.
+2. **Correct full-bleed** — negative margins are gone. `body.bbca-canvas-active #wpcontent { padding-left: 0 }` removes the gutter from the column instead of out-denting the canvas. No menu width is assumed anywhere, so this is also correct when the menu is folded (`.folded #wpcontent { margin-left: 36px }`).
+3. **Head-time Beaver Builder assets** — `enqueue_assets()` now calls `FLBuilder::enqueue_layout_styles_scripts()` for the assigned layout (wrapped in `FLBuilderModel::set_post_id()` / `reset_post_id()`, all guarded by `method_exists`). Previously the layout stylesheet was first enqueued by `FLBuilderShortcode::insert()` during `render_canvas()` on `all_admin_notices` (`admin-header.php:321`), long after `admin_print_styles` (`:137`), so it was deferred to the footer and the layout's row/column width rules were missing on first paint.
+4. **Feature-scoped CSS** — a new `admin_body_class` filter adds `bbca-canvas-active`. All canvas, squash, and branding CSS is scoped to that class rather than `body.index-php`, which is the screen rather than the feature.
+5. **Footer clearance restored** — `padding-bottom: 0 !important` on `#wpbody-content` removed the 65px core reserves for `#wpfooter` (`position: absolute; bottom: 0`), which then sat on top of the canvas.
+6. **Responsive admin bar** — `min-height` now reads `var( --wp-admin--admin-bar--height, 32px )`, which core defines on `html` and switches to `46px` below 782px, instead of hardcoding 32px.
+7. **Overflow guard** — `overflow-x: clip` on the canvas contains any layout wider than the admin column. `clip` rather than `hidden` deliberately: `overflow-x: hidden` forces `overflow-y` to `auto`, which would give the canvas its own scrollbar and break `position: sticky` inside the layout.
+8. **New "Full-Bleed Rows" option** — the ~157px gutters on each side of the dashboard were Beaver Builder's own global `.fl-row-fixed-width { max-width: <row_width>px }` (`class-fl-builder.php:1951`), not a bug. The new toggle emits `#bbca-custom-dashboard-canvas .fl-row-fixed-width { max-width: 100% }` as inline style so rows fill the admin column. Defaults to off; the layout is unaffected on the front end.
+
+**Known limitation (not fixed):** Beaver Builder's responsive breakpoints are viewport-width media queries, but the canvas is 160px (or 36px folded) narrower than the viewport, so the layout switches to its medium/mobile treatment about a menu-width late. There is no clean fix short of container queries — set the layout's BB global row width with that offset in mind and test the folded menu.
+
+**Correction to the v1.3.2 record below:** that entry attributes the breakage to the `in_admin_header` hook placement and says the negative margins were "countering the wrong container's padding." The hook change was correct and remains in place, but there was never a right container to counter — `#wpbody-content` has no horizontal padding on any WordPress version. The margins were wrong in both directions from the day they were written.
+
+**Files changed:**
+- `assets/css/admin-canvas.css` — Rewritten layout rules: no negative margins, feature-scoped selectors, footer clearance, responsive admin-bar height, overflow guard.
+- `assets/css/admin.css` — Deleted. Unreferenced since the Tailwind rebuild in v1.0.0.
+- `includes/modules/class-dashboard-canvas.php` — `FULL_BLEED_OPTION` and `BODY_CLASS` constants, `add_body_class()`, `enqueue_layout_assets()`, rewritten `enqueue_assets()`, body-class-scoped squash and branding CSS.
+- `classes/class-onedog-bb-rest.php` — `full_bleed_rows` in the `/dashboard-canvas` GET/POST handlers and in export/import.
+- `src/components/DashboardCanvas.jsx` — "Row Width" card with the Full-Bleed Rows toggle.
+- `beaver-builder-custom-admin.php`, `package.json` — Version `1.3.3`.
+- `readme.txt` — Stable tag, changelog, upgrade notice.
+- `build/*` — Regenerated.
+- `STATE.md` — This section.
+
+**New option key:**
+
+| Option | Type | Purpose |
+|--------|------|---------|
+| `onedog_bbca_canvas_full_bleed_rows` | bool | Override Beaver Builder's fixed row width inside the canvas |
+
+**Not verified on a live site.** These changes were made from static analysis of the plugin, WordPress core (`common.css`, `admin-menu.css`, `admin-header.php`), Beaver Builder's CSS generator, and White Label CMS. Verification checklist, to run as a target role on `/wp-admin/index.php`:
+
+- `document.documentElement.scrollWidth - document.documentElement.clientWidth === 0`
+- Canvas left edge at x=160 unfolded and x=36 folded, via `getBoundingClientRect()`
+- Beaver Builder layout stylesheet present in `<head>`, no reflow on load
+- Admin footer below the canvas, not overlapping it
+- At a 700px viewport the min-height resolves against a 46px bar and the menu auto-folds without overlap
+- `?bbca_bypass=1` restores the native dashboard with core gutters intact
+- A non-target role has no `bbca-canvas-active` class on `<body>`
+
+Purge LiteSpeed Cache once after deploying — mtime versioning fixes future edits, but the already-optimized combined CSS has to be dropped by hand.
+
+---
+
+## Historical Phase: v1.3.2 (Dashboard Canvas Layout Fix)
 
 ### v1.3.2 Modifications
 

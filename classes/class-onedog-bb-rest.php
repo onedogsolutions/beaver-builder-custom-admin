@@ -516,6 +516,7 @@ final class OneDog_BB_REST {
 			'canvas_target_roles' => (array) get_option( 'onedog_bbca_canvas_target_roles', [] ),
 			'canvas_enable_squash' => (bool) get_option( 'onedog_bbca_canvas_enable_squash', false ),
 			'canvas_hide_wp_branding' => (bool) get_option( 'onedog_bbca_canvas_hide_wp_branding', false ),
+			'canvas_full_bleed_rows' => (bool) get_option( 'onedog_bbca_canvas_full_bleed_rows', false ),
 		];
 
 		// Export all role capabilities.
@@ -573,6 +574,9 @@ final class OneDog_BB_REST {
 		}
 		if ( isset( $config['canvas_hide_wp_branding'] ) ) {
 			update_option( 'onedog_bbca_canvas_hide_wp_branding', ! empty( $config['canvas_hide_wp_branding'] ) );
+		}
+		if ( isset( $config['canvas_full_bleed_rows'] ) ) {
+			update_option( 'onedog_bbca_canvas_full_bleed_rows', ! empty( $config['canvas_full_bleed_rows'] ) );
 		}
 
 		return rest_ensure_response( [ 'success' => true ] );
@@ -813,6 +817,7 @@ final class OneDog_BB_REST {
 				'target_roles'      => (array) get_option( 'onedog_bbca_canvas_target_roles', [] ),
 				'enable_squash'     => (bool) get_option( 'onedog_bbca_canvas_enable_squash', false ),
 				'hide_wp_branding'  => (bool) get_option( 'onedog_bbca_canvas_hide_wp_branding', false ),
+				'full_bleed_rows'   => (bool) get_option( 'onedog_bbca_canvas_full_bleed_rows', false ),
 			],
 		] );
 	}
@@ -842,6 +847,7 @@ final class OneDog_BB_REST {
 
 		update_option( 'onedog_bbca_canvas_enable_squash', ! empty( $settings['enable_squash'] ) );
 		update_option( 'onedog_bbca_canvas_hide_wp_branding', ! empty( $settings['hide_wp_branding'] ) );
+		update_option( 'onedog_bbca_canvas_full_bleed_rows', ! empty( $settings['full_bleed_rows'] ) );
 
 		return rest_ensure_response( [ 'success' => true ] );
 	}

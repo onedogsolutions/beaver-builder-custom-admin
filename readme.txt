@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.2
+Stable tag: 1.3.3
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,17 @@ All data remains local to your WordPress installation.
 
 == Changelog ==
 
+= 1.3.3 =
+* Fixed the Dashboard Canvas overlapping the WordPress admin menu. The full-bleed negative margins were sized to cancel a horizontal padding that #wpbody-content does not have — the gutter belongs to #wpcontent — so the canvas hung 20px past the column on both sides and put the admin page into horizontal overflow.
+* Full bleed is now achieved by zeroing #wpcontent's padding for the canvas only, which is also correct when the admin menu is folded.
+* The canvas stylesheet is now versioned by file modification time, so CSS changes bust browser and page caches without a plugin version bump.
+* Beaver Builder layout assets are now enqueued on admin_enqueue_scripts instead of during render, so the layout stylesheet reaches the document head and the dashboard no longer reflows on load.
+* New "Full-Bleed Rows" option: let rows fill the admin content column instead of Beaver Builder's global fixed row width.
+* Canvas CSS is now scoped to a dedicated body class (bbca-canvas-active) rather than body.index-php.
+* Restored the 65px bottom padding that WordPress reserves for the absolutely positioned admin footer.
+* The canvas minimum height now reads the admin bar height from core's --wp-admin--admin-bar--height custom property (46px on small screens) instead of hardcoding 32px.
+* Removed the unused assets/css/admin.css left over from the pre-Tailwind settings UI.
+
 = 1.3.2 =
 * Fixed Dashboard Canvas layout regression after Welcome Screen removal.
 * Canvas container is now injected inside #wpbody-content via all_admin_notices, restoring correct alignment and preventing #wpbody collapse.
@@ -120,6 +131,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.3.3 =
+Fixes the Dashboard Canvas covering the admin menu, and makes canvas stylesheet updates cache-bust correctly. If you are upgrading from 1.3.x, purge any page/CSS caching plugin once after updating.
 
 = 1.2.0 =
 The Option Cleaner has moved to a standalone plugin and is no longer part of this plugin. Also fixes the Menu Restrictor menu list not loading.
