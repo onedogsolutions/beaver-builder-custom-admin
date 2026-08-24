@@ -24,7 +24,6 @@ body.index-php #wpbody-content > .wrap {
 
 /* Full-bleed custom canvas container */
 #bbca-custom-dashboard-canvas {
-	margin: -20px -20px 0 -20px; /* Counter default #wpbody-content padding */
 	background: #f0f0f1;
 	min-height: calc(100vh - 32px);
 }
