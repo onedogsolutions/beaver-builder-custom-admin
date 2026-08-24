@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,10 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.3.2 =
+* Fixed Dashboard Canvas layout regression after Welcome Screen removal.
+* Canvas container is now injected inside #wpbody-content via all_admin_notices, restoring correct alignment and preventing #wpbody collapse.
 
 = 1.3.1 =
 * Removed remaining Dashboard Welcome references and dead welcome-panel assets.

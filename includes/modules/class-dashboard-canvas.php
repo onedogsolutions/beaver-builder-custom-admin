@@ -92,8 +92,10 @@ final class OneDog_BBCA_Dashboard_Canvas {
 		// 2. Wipe standard core and 3rd-party dashboard widgets.
 		add_action( 'wp_dashboard_setup', [ __CLASS__, 'clear_widgets' ], 9999 );
 
-		// 3. Inject custom Beaver Builder layout container.
-		add_action( 'in_admin_header', [ __CLASS__, 'render_canvas' ] );
+		// 3. Inject custom Beaver Builder layout container inside #wpbody-content.
+		// Using all_admin_notices at a late priority places the canvas after the
+		// squash output buffer ends, ensuring it is not captured as a notice.
+		add_action( 'all_admin_notices', [ __CLASS__, 'render_canvas' ], 10000 );
 
 		// 4. Enqueue canvas-specific CSS.
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );

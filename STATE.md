@@ -2,9 +2,33 @@
 
 ## Release state
 
-**`main` is at v1.3.1** as of the Welcome Screen removal + minor version bump. Previous: v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.2** as of the Dashboard Canvas layout fix. Previous: v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.1 (Welcome Screen Removal + Patch)
+## Current Phase: v1.3.2 (Dashboard Canvas Layout Fix)
+
+### v1.3.2 Modifications
+
+**Fixed Dashboard Canvas layout broken after Welcome Screen removal.**
+
+After the legacy Welcome Screen module was removed, the Dashboard Canvas module was the sole renderer for `/wp-admin/index.php`. The canvas was being injected via `in_admin_header`, which on the current WordPress core fires **before** `#wpbody` and `#wpbody-content` are opened. This placed `#bbca-custom-dashboard-canvas` as a direct child of `#wpcontent` instead of `#wpbody-content`, causing:
+
+- `#wpbody` and `#wpbody-content` to collapse to `height: 0` because the native `.wrap` content was hidden by canvas CSS.
+- The full-bleed negative margins in `assets/css/admin-canvas.css` to counter the wrong container's padding, resulting in misaligned dashboard content.
+
+**Fix:** Changed the canvas injection hook in `OneDog_BBCA_Dashboard_Canvas::setup_dashboard()` from `in_admin_header` to `all_admin_notices` at priority `10000`. This fires inside `#wpbody-content`, after the notice-squash output buffer ends (when squashing is enabled), so the canvas is rendered in the correct location and is not captured as a notice.
+
+**Files changed:**
+- `includes/modules/class-dashboard-canvas.php` — Canvas now hooks to `all_admin_notices` priority `10000` instead of `in_admin_header`.
+- `beaver-builder-custom-admin.php` — Version bumped to `1.3.2`.
+- `package.json` — Version bumped to `1.3.2`.
+- `readme.txt` — Stable tag and changelog updated for v1.3.2.
+- `STATE.md` — This section.
+
+**Verified on ott-dev.onedog.solutions:** Canvas is now a child of `#wpbody-content`, `#wpbody`/`#wpbody-content` have visible height, and the dashboard renders in the correct admin content area.
+
+---
+
+## Historical Phase: v1.3.1 (Welcome Screen Removal + Patch)
 
 ### v1.3.0 Modifications
 
