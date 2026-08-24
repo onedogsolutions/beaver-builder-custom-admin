@@ -2,9 +2,42 @@
 
 ## Release state
 
-**`main` is at v1.3.3** as of the Dashboard Canvas admin-menu overlap fix. Previous: v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.4** as of the settings-page menu relocation. Previous: v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.3 (Dashboard Canvas Admin-Menu Overlap Fix)
+## Current Phase: v1.3.4 (Settings Page Menu Relocation)
+
+### v1.3.4 Modifications
+
+**Fixed: the settings page could not be reached on ott-dev.onedog.solutions.**
+
+**Root cause — the page was the last entry in a flyout taller than the viewport.** `onedog_bbca_admin_menu()` registered the page with `add_options_page()`, which appends to the Settings submenu, on `admin_menu` at priority 25. On a site carrying a normal plugin load-out (the target site adds Connectors, FluentSMTP, HappyFiles, LiteSpeed Cache, WPCodeBox and others to Settings) that submenu is taller than the screen, so the flyout runs off the bottom of the viewport and the entries at its end — this one among them — are not reachable by hover.
+
+Nothing was removing the page. It was registered, and `options-general.php?page=onedog-bbca-settings` loaded it correctly the whole time; only the sidebar affordance was missing. This was reported alongside "we do not have the 1.3.3 version", but the site was already running 1.3.3 — the two symptoms were one problem: the 1.3.3 settings (the new Row Width card) were behind a menu entry that could not be clicked.
+
+**Fixes applied:**
+
+1. **Top-level menu item** — `add_menu_page()` with the `dashicons-admin-customizer` icon at position `80.7`, placing "Custom Admin" directly after Settings in the sidebar. A top-level item does not depend on flyout height or on how many other plugins have claimed the parent menu.
+2. **Fractional position** — `80.7` rather than `81`, since WordPress keys `$menu` by position and an integer collision silently overwrites whichever plugin registered second.
+3. **Legacy URL redirect** — `onedog_bbca_redirect_legacy_settings_url()` on `admin_init` sends `options-general.php?page=onedog-bbca-settings` to `admin.php?page=onedog-bbca-settings`, so existing bookmarks and any stored Menu Restrictor rules pointing at the old parent keep working.
+4. **Asset enqueue hook suffix** — `onedog_bbca_enqueue_settings_assets()` matched the literal `settings_page_onedog-bbca-settings`, which the top-level page no longer produces; it now matches `toplevel_page_*` and keeps the old suffix as a fallback. Without this the page would have rendered an empty React root.
+
+The menu slug is now the `BBCA_MENU_SLUG` constant rather than a string repeated across the registration, the redirect, and the enqueue guard.
+
+**Files changed:**
+- `beaver-builder-custom-admin.php` — `BBCA_MENU_SLUG`, `add_menu_page()` in place of `add_options_page()`, legacy redirect, hook-suffix match, version `1.3.4`.
+- `package.json` — Version `1.3.4`.
+- `readme.txt` — Stable tag, changelog, upgrade notice.
+- `STATE.md` — This section.
+
+`build/` is unchanged — this release touches no JavaScript.
+
+**Released to `main`** via `claude/admin-menu-version-access-hhxlc0`. A distributable build is produced with `bin/build-zip.sh`.
+
+**Verification on the live site:** "Custom Admin" appears as a top-level sidebar item below Settings; it opens the React settings app with the Dashboard Canvas tab and its 1.3.3 "Row Width" card; and `options-general.php?page=onedog-bbca-settings` redirects to `admin.php?page=onedog-bbca-settings` rather than erroring.
+
+---
+
+## Historical Phase: v1.3.3 (Dashboard Canvas Admin-Menu Overlap Fix)
 
 ### v1.3.3 Modifications
 
@@ -57,7 +90,7 @@ So the left `-20px` pulled the canvas out of the content column and onto the adm
 
 **Released to `main`** via `claude/dashboard-content-offset-menu-hvihlr`. A distributable test build is produced with `bin/build-zip.sh`.
 
-**Not verified on a live site.** These changes were made from static analysis of the plugin, WordPress core (`common.css`, `admin-menu.css`, `admin-header.php`), Beaver Builder's CSS generator, and White Label CMS. Verification checklist, to run as a target role on `/wp-admin/index.php`:
+**Deployed to ott-dev.onedog.solutions, canvas checklist still unrun.** The site was confirmed running 1.3.3 during the v1.3.4 investigation, so these changes are live. The "admin menu is covered" report that followed the deploy turned out to be the settings-page access problem fixed in v1.3.4, not a canvas regression — it is not evidence either way about the layout fix below, which was made from static analysis of the plugin, WordPress core (`common.css`, `admin-menu.css`, `admin-header.php`), Beaver Builder's CSS generator, and White Label CMS. Verification checklist, still to run as a target role on `/wp-admin/index.php`:
 
 - `document.documentElement.scrollWidth - document.documentElement.clientWidth === 0`
 - Canvas left edge at x=160 unfolded and x=36 folded, via `getBoundingClientRect()`
@@ -69,7 +102,7 @@ So the left `-20px` pulled the canvas out of the content column and onto the adm
 
 Purge LiteSpeed Cache once after deploying — mtime versioning fixes future edits, but the already-optimized combined CSS has to be dropped by hand.
 
-**Also check the settings UI**, since the Full-Bleed Rows toggle is new: Settings → Custom Admin → Dashboard Canvas should show a "Row Width" card, and toggling it should persist across a reload and survive an export/import round trip.
+**Also check the settings UI**, since the Full-Bleed Rows toggle is new: Custom Admin → Dashboard Canvas (a top-level sidebar item since v1.3.4; it was Settings → Custom Admin when this was written) should show a "Row Width" card, and toggling it should persist across a reload and survive an export/import round trip.
 
 ---
 
