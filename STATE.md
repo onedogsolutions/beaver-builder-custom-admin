@@ -40,6 +40,14 @@ Exercised against a stubbed WordPress + Beaver Builder harness covering: layout 
 - `beaver-builder-custom-admin.php`, `package.json`, `readme.txt` — version 1.3.5, changelog.
 - `PLAN-1.3.5-canvas-styling-assets.md` — the plan this implements.
 
+### Release
+
+Merged to `main` and packaged for testing: `dist/beaver-builder-custom-admin-1.3.5.zip`, 21 files, 64K. Contents spot-checked — runtime files only, with `src/`, `node_modules/`, `bin/`, `STATE.md` and the plan document all correctly excluded by `bin/build-zip.sh`.
+
+**Testing this build.** Install the zip, then before looking at anything else load `/wp-admin/index.php?bbca_debug_styles=1` and a front-end page rendering the same layout with the same argument, and diff the `bbca-debug-styles` HTML comment in each. That diff is the ground truth for whether the fix reached the right stylesheets, and it is worth capturing here even if the buttons now look correct — the root-cause analysis above is inference from the codebase, not from the live install.
+
+Then check, in order: button hover on a button inheriting global colours; typography against the front end; that the admin menu, toolbar and footer are visually unchanged; and that `?bbca_bypass=1` still returns the native dashboard. If hover is still wrong, the missing source will be named in the stylesheet diff, and the Theme Styles toggle is the next thing to try — expect it to restyle the admin chrome when enabled.
+
 ## Historical Phase: v1.3.4 (Settings Page Menu Relocation)
 
 ### v1.3.4 Modifications
