@@ -2,11 +2,78 @@
 
 ## Release state
 
-**`main` is at v1.2.0** as of the Option Cleaner removal (ported to a standalone plugin). Previous: v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.0** as of the Dashboard Canvas & 3rd-Party Squashing implementation. Previous: v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.2.0 (Option Cleaner Removal + Menu Restrictor Fix)
+## Current Phase: v1.3.0 (Dashboard Canvas & 3rd-Party Squashing)
 
-### v1.2.0 Modifications
+### v1.3.0 Modifications
+
+**New module: Dashboard Canvas (`dashboard-canvas`).** Transforms the plugin from a `welcome_panel` overlay into a full-bleed dashboard canvas replacement on `/wp-admin/index.php`. Simultaneously achieves feature parity with `white-label-cms` by suppressing third-party plugin notices, unauthorized dashboard widgets, toolbar links, and side-menu items for targeted user roles.
+
+**Architecture — Full dashboard body replacement.**
+
+The canvas module hooks into `current_screen` and, when active for the current user on the dashboard:
+1. Removes the native WordPress welcome panel (`remove_action('welcome_panel', 'wp_welcome_panel')`)
+2. Wipes all dashboard meta boxes (widgets) via `wp_dashboard_setup` at priority `9999`
+3. Injects a full-bleed Beaver Builder layout container via `in_admin_header`
+4. Enqueues BB layout CSS/JS and canvas-specific full-bleed styles
+
+**3rd-Party Injection Squashing.**
+
+When the squash toggle is enabled:
+- **Notice suppression:** Output-buffers and discards all content between `admin_notices` (priority 1) and `all_admin_notices` (priority 9999)
+- **Toolbar sanitization:** Whitelist-based removal of top-level admin bar nodes (`wp-logo`, `site-name`, `my-account`, `logout`, `fl-builder-frontend` preserved) at priority `9999`
+- **CSS safety net:** Hides `.notice`, `.update-nag`, `.error`, `.updated` via inline styles
+
+**WordPress Branding Removal.**
+
+Optional toggle to strip WP logos, update naggers, and footer credits for target roles on the dashboard.
+
+**Safety Rules & Role Verification.**
+
+- Emergency bypass: `?bbca_bypass=1` for administrators (`manage_options`)
+- Dependency check: canvas auto-disables when Beaver Builder is deactivated
+- Role-based targeting: only configured roles see the canvas
+- Layout existence check: gracefully skips if the assigned layout post is deleted
+- Welcome-screen module auto-skips when canvas is active (prevents duplicate rendering)
+
+**New option keys:**
+
+| Option | Type | Purpose |
+|--------|------|--------|
+| `onedog_bbca_canvas_layout_id` | int | Post ID of the selected BB layout |
+| `onedog_bbca_canvas_target_roles` | array | Roles subject to canvas + squashing |
+| `onedog_bbca_canvas_enable_squash` | bool | Master toggle for 3rd-party injection suppression |
+| `onedog_bbca_canvas_hide_wp_branding` | bool | Toggle to strip WP logos and footer credits |
+
+**REST API — New Endpoints.**
+
+| Route | Method | Purpose |
+|-------|--------|--------|
+| `/onedog-bbca/v1/dashboard-canvas` | GET | Retrieve canvas settings |
+| `/onedog-bbca/v1/dashboard-canvas` | POST | Save canvas settings |
+
+**Existing endpoint changes:**
+
+- `/onedog-bbca/v1/layouts` now includes `id` (post ID) alongside `slug` and `name`
+- `/onedog-bbca/v1/export` includes canvas settings (`canvas_layout_id`, `canvas_target_roles`, `canvas_enable_squash`, `canvas_hide_wp_branding`)
+- `/onedog-bbca/v1/import` restores canvas settings from exported config
+
+**Files added:**
+- `includes/modules/class-dashboard-canvas.php` — Canvas module (dashboard replacement, squashing, branding removal, safety checks)
+- `assets/css/admin-canvas.css` — Full-bleed canvas styling
+- `src/components/DashboardCanvas.jsx` — React settings component (layout selector, target roles, squash/branding toggles)
+
+**Files changed:**
+- `includes/modules/class-module-loader.php` — Registered `dashboard-canvas` module + metadata
+- `includes/modules/class-welcome-screen.php` — Conditional skip when canvas is active for user
+- `classes/class-onedog-bb-rest.php` — Added `/dashboard-canvas` routes, `id` field in layouts, canvas in import/export
+- `src/components/App.jsx` — Added Dashboard Canvas tab
+- `beaver-builder-custom-admin.php` — Version bumped to 1.3.0, updated description
+- `package.json` — Version bumped to 1.3.0
+- `STATE.md` — This section
+
+---
 
 **Option Cleaner removed.** The Orphaned Option Cleaner module (`option-cleaner`) was ported to a dedicated standalone plugin and fully removed from this plugin: module class, loader registration, REST endpoints, and React tab.
 

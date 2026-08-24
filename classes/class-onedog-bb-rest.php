@@ -168,6 +168,20 @@ final class OneDog_BB_REST {
 			'callback'            => [ __CLASS__, 'import_ure_config' ],
 			'permission_callback' => [ __CLASS__, 'check_permission' ],
 		] );
+
+		// Dashboard Canvas.
+		register_rest_route( self::NAMESPACE, '/dashboard-canvas', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ __CLASS__, 'get_dashboard_canvas' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ __CLASS__, 'save_dashboard_canvas' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+		] );
 	}
 
 	/**
@@ -377,7 +391,11 @@ final class OneDog_BB_REST {
 		] );
 
 		foreach ( $posts as $post ) {
-			$templates[] = [ 'slug' => $post->post_name, 'name' => $post->post_title ];
+			$templates[] = [
+				'id'   => $post->ID,
+				'slug' => $post->post_name,
+				'name' => $post->post_title,
+			];
 		}
 		return $templates;
 	}
@@ -526,6 +544,10 @@ final class OneDog_BB_REST {
 			'modules' => get_option( 'onedog_bbca_modules', [] ),
 			'templates' => get_option( 'onedog_bbca_template', [] ),
 			'notice_cleaner' => get_option( 'onedog_bbca_notice_cleaner', [] ),
+			'canvas_layout_id' => absint( get_option( 'onedog_bbca_canvas_layout_id', 0 ) ),
+			'canvas_target_roles' => (array) get_option( 'onedog_bbca_canvas_target_roles', [] ),
+			'canvas_enable_squash' => (bool) get_option( 'onedog_bbca_canvas_enable_squash', false ),
+			'canvas_hide_wp_branding' => (bool) get_option( 'onedog_bbca_canvas_hide_wp_branding', false ),
 		];
 
 		// Export all role capabilities.
@@ -574,6 +596,20 @@ final class OneDog_BB_REST {
 		// Import notice cleaner settings.
 		if ( isset( $config['notice_cleaner'] ) && is_array( $config['notice_cleaner'] ) ) {
 			update_option( 'onedog_bbca_notice_cleaner', $config['notice_cleaner'] );
+		}
+
+		// Import dashboard canvas settings.
+		if ( isset( $config['canvas_layout_id'] ) ) {
+			update_option( 'onedog_bbca_canvas_layout_id', absint( $config['canvas_layout_id'] ) );
+		}
+		if ( isset( $config['canvas_target_roles'] ) && is_array( $config['canvas_target_roles'] ) ) {
+			update_option( 'onedog_bbca_canvas_target_roles', array_map( 'sanitize_text_field', $config['canvas_target_roles'] ) );
+		}
+		if ( isset( $config['canvas_enable_squash'] ) ) {
+			update_option( 'onedog_bbca_canvas_enable_squash', ! empty( $config['canvas_enable_squash'] ) );
+		}
+		if ( isset( $config['canvas_hide_wp_branding'] ) ) {
+			update_option( 'onedog_bbca_canvas_hide_wp_branding', ! empty( $config['canvas_hide_wp_branding'] ) );
 		}
 
 		return rest_ensure_response( [ 'success' => true ] );
@@ -793,6 +829,58 @@ final class OneDog_BB_REST {
 	 */
 	private static function sanitize_cap( $cap ) {
 		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $cap ) );
+	}
+
+	/*
+	|--------------------------------------------------------------------------
+	| Dashboard Canvas Endpoints
+	|--------------------------------------------------------------------------
+	*/
+
+	/**
+	 * Returns the dashboard canvas settings.
+	 *
+	 * @since 1.3.0
+	 * @return WP_REST_Response
+	 */
+	public static function get_dashboard_canvas() {
+		return rest_ensure_response( [
+			'settings' => [
+				'layout_id'         => absint( get_option( 'onedog_bbca_canvas_layout_id', 0 ) ),
+				'target_roles'      => (array) get_option( 'onedog_bbca_canvas_target_roles', [] ),
+				'enable_squash'     => (bool) get_option( 'onedog_bbca_canvas_enable_squash', false ),
+				'hide_wp_branding'  => (bool) get_option( 'onedog_bbca_canvas_hide_wp_branding', false ),
+			],
+		] );
+	}
+
+	/**
+	 * Saves the dashboard canvas settings.
+	 *
+	 * @since 1.3.0
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function save_dashboard_canvas( $request ) {
+		$settings = $request->get_param( 'settings' );
+
+		if ( ! is_array( $settings ) ) {
+			return new WP_Error( 'invalid_data', __( 'Settings must be an array.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		update_option( 'onedog_bbca_canvas_layout_id', absint( $settings['layout_id'] ?? 0 ) );
+
+		update_option(
+			'onedog_bbca_canvas_target_roles',
+			isset( $settings['target_roles'] ) && is_array( $settings['target_roles'] )
+				? array_map( 'sanitize_text_field', $settings['target_roles'] )
+				: []
+		);
+
+		update_option( 'onedog_bbca_canvas_enable_squash', ! empty( $settings['enable_squash'] ) );
+		update_option( 'onedog_bbca_canvas_hide_wp_branding', ! empty( $settings['hide_wp_branding'] ) );
+
+		return rest_ensure_response( [ 'success' => true ] );
 	}
 }
 

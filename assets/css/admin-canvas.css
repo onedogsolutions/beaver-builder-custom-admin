@@ -1,0 +1,56 @@
+/**
+ * Beaver Builder Custom Admin — Dashboard Canvas Full-Bleed Styles
+ *
+ * Removes default WordPress admin margins, screen option links,
+ * and layout gaps on /wp-admin/index.php to achieve edge-to-edge
+ * Beaver Builder layout rendering.
+ *
+ * @since 1.3.0
+ * @package OneDog\BBCustomAdmin
+ */
+
+/* Edge-to-edge layout styling on wp-admin/index.php */
+body.index-php #wpbody-content {
+	padding-bottom: 0 !important;
+}
+
+/* Hide standard dashboard elements and widgets */
+body.index-php #wpbody-content > div:not(#bbca-custom-dashboard-canvas),
+body.index-php #screen-meta-links,
+body.index-php #screen-meta,
+body.index-php #welcome-panel,
+body.index-php #wpbody-content > .wrap {
+	display: none !important;
+}
+
+/* Full-bleed custom canvas container */
+#bbca-custom-dashboard-canvas {
+	margin: -20px -20px 0 -20px; /* Counter default #wpbody-content padding */
+	background: #f0f0f1;
+	min-height: calc(100vh - 32px);
+}
+
+/* BB content resets within the canvas */
+#bbca-custom-dashboard-canvas .fl-builder-content ul,
+#bbca-custom-dashboard-canvas .fl-builder-content ol {
+	list-style: inherit;
+}
+
+#bbca-custom-dashboard-canvas .fl-builder-content p {
+	color: inherit;
+	font-size: inherit;
+	margin: inherit;
+	margin-bottom: 10px;
+}
+
+#bbca-custom-dashboard-canvas input:focus,
+#bbca-custom-dashboard-canvas textarea:focus,
+#bbca-custom-dashboard-canvas select:focus,
+#bbca-custom-dashboard-canvas button:focus {
+	-webkit-box-shadow: none;
+	box-shadow: none;
+}
+
+#bbca-custom-dashboard-canvas {
+	-webkit-font-smoothing: antialiased;
+}

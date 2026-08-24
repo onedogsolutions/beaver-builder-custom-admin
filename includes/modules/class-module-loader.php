@@ -52,10 +52,11 @@ final class OneDog_BBCA_Module_Loader {
 	 */
 	private static function register_defaults() {
 		self::$registry = [
-			'role-editor'      => BBCA_DIR . 'includes/modules/class-role-editor.php',
-			'welcome-screen'   => BBCA_DIR . 'includes/modules/class-welcome-screen.php',
-			'menu-visibility'  => BBCA_DIR . 'includes/modules/class-menu-visibility.php',
-			'notice-cleaner'   => BBCA_DIR . 'includes/modules/class-notice-cleaner.php',
+			'role-editor'       => BBCA_DIR . 'includes/modules/class-role-editor.php',
+			'welcome-screen'    => BBCA_DIR . 'includes/modules/class-welcome-screen.php',
+			'menu-visibility'   => BBCA_DIR . 'includes/modules/class-menu-visibility.php',
+			'notice-cleaner'    => BBCA_DIR . 'includes/modules/class-notice-cleaner.php',
+			'dashboard-canvas'  => BBCA_DIR . 'includes/modules/class-dashboard-canvas.php',
 		];
 	}
 
@@ -118,6 +119,10 @@ final class OneDog_BBCA_Module_Loader {
 			'notice-cleaner'  => [
 				'label'       => __( 'Admin UI & Notice Cleaner', 'bb-custom-admin' ),
 				'description' => __( 'Hide update notices, core alerts, and toolbar clutter for non-admin roles.', 'bb-custom-admin' ),
+			],
+			'dashboard-canvas' => [
+				'label'       => __( 'Dashboard Canvas', 'bb-custom-admin' ),
+				'description' => __( 'Replace the entire dashboard with a full-bleed Beaver Builder layout and squash 3rd-party injections.', 'bb-custom-admin' ),
 			],
 		];
 

@@ -69,6 +69,12 @@ final class OneDog_BBCA_Welcome_Screen {
 	 * @return void
 	 */
 	public static function maybe_replace_panel() {
+		// Skip when the dashboard canvas module is active for this user.
+		if ( class_exists( 'OneDog_BBCA_Dashboard_Canvas' )
+			&& OneDog_BBCA_Dashboard_Canvas::is_active_for_user() ) {
+			return;
+		}
+
 		self::$current_role = self::get_current_role();
 		self::$template     = get_option( self::OPTION_KEY, [] );
 

@@ -15,6 +15,7 @@ import MenuRestrictor from './MenuRestrictor';
 import WelcomeScreen from './WelcomeScreen';
 import ModuleSettings from './ModuleSettings';
 import ImportExport from './ImportExport';
+import DashboardCanvas from './DashboardCanvas';
 
 const TABS = [
 	{
@@ -28,6 +29,10 @@ const TABS = [
 	{
 		id: 'welcome',
 		label: __( 'Welcome Screen', 'bb-custom-admin' ),
+	},
+	{
+		id: 'canvas',
+		label: __( 'Dashboard Canvas', 'bb-custom-admin' ),
 	},
 	{
 		id: 'modules',
@@ -125,6 +130,7 @@ export default function App() {
 				{ activeTab === 'roles' && <RoleEditor showToast={ showToast } /> }
 				{ activeTab === 'menus' && <MenuRestrictor showToast={ showToast } /> }
 				{ activeTab === 'welcome' && <WelcomeScreen showToast={ showToast } /> }
+				{ activeTab === 'canvas' && <DashboardCanvas showToast={ showToast } /> }
 				{ activeTab === 'modules' && <ModuleSettings showToast={ showToast } /> }
 				{ activeTab === 'import-export' && <ImportExport showToast={ showToast } /> }
 			</div>
