@@ -4,7 +4,7 @@
  * Description: Modular WordPress admin customization — full-bleed dashboard canvas, role/menu/toolbar visibility, notice cleaner, and 3rd-party squashing by user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
- * Version: 1.3.3
+ * Version: 1.3.4
  * Requires at least: 5.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '1.3.3' );
+define( 'BBCA_VER', '1.3.4' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );
@@ -43,21 +43,61 @@ function onedog_bbca_activate() {
 register_activation_hook( __FILE__, 'onedog_bbca_activate' );
 
 /**
- * Registers the settings admin page under Settings menu.
+ * Menu slug for the settings page.
+ *
+ * @since 1.3.4
+ */
+define( 'BBCA_MENU_SLUG', 'onedog-bbca-settings' );
+
+/**
+ * Registers the settings page as a top-level admin menu item.
+ *
+ * Was a Settings submenu until 1.3.4. On a site with a normal plugin
+ * load-out the Settings flyout is taller than the viewport, and because
+ * add_options_page() appends, this page was the last entry in it - below
+ * the fold and unreachable by hover. A top-level item does not depend on
+ * flyout height or on where the parent sits in the sidebar.
  *
  * @since 0.2.0
  * @return void
  */
 function onedog_bbca_admin_menu() {
-	add_options_page(
+	add_menu_page(
 		__( 'Custom Admin', 'bb-custom-admin' ),
 		__( 'Custom Admin', 'bb-custom-admin' ),
 		'manage_options',
-		'onedog-bbca-settings',
-		'onedog_bbca_render_settings_page'
+		BBCA_MENU_SLUG,
+		'onedog_bbca_render_settings_page',
+		'dashicons-admin-customizer',
+		80.7
 	);
 }
 add_action( 'admin_menu', 'onedog_bbca_admin_menu', 25 );
+
+/**
+ * Redirects the pre-1.3.4 Settings submenu URL to the top-level page.
+ *
+ * Keeps existing bookmarks and any stored Menu Restrictor rules that
+ * still point at options-general.php working.
+ *
+ * @since 1.3.4
+ * @return void
+ */
+function onedog_bbca_redirect_legacy_settings_url() {
+	if ( 'options-general.php' !== ( $GLOBALS['pagenow'] ?? '' ) ) {
+		return;
+	}
+
+	$page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+
+	if ( BBCA_MENU_SLUG !== $page ) {
+		return;
+	}
+
+	wp_safe_redirect( admin_url( 'admin.php?page=' . BBCA_MENU_SLUG ) );
+	exit;
+}
+add_action( 'admin_init', 'onedog_bbca_redirect_legacy_settings_url' );
 
 /**
  * Renders the settings page root element for React.
@@ -77,7 +117,15 @@ function onedog_bbca_render_settings_page() {
  * @return void
  */
 function onedog_bbca_enqueue_settings_assets( $hook_suffix ) {
-	if ( 'settings_page_onedog-bbca-settings' !== $hook_suffix ) {
+	// 'toplevel_page_*' since 1.3.4; 'settings_page_*' is the pre-1.3.4
+	// hook suffix, kept so the page still loads its assets if anything
+	// re-parents it under Settings.
+	$hooks = [
+		'toplevel_page_' . BBCA_MENU_SLUG,
+		'settings_page_' . BBCA_MENU_SLUG,
+	];
+
+	if ( ! in_array( $hook_suffix, $hooks, true ) ) {
 		return;
 	}
 

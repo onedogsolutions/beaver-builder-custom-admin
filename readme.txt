@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.3
+Stable tag: 1.3.4
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,10 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.3.4 =
+* The settings page has moved from Settings → Custom Admin to its own top-level "Custom Admin" item in the admin sidebar. As a Settings submenu it was registered last, so on a site with a normal plugin load-out it sat below the bottom of the viewport in a flyout taller than the screen and could not be reached by hover.
+* The old options-general.php?page=onedog-bbca-settings URL now redirects to the new location, so existing bookmarks keep working.
 
 = 1.3.3 =
 * Fixed the Dashboard Canvas overlapping the WordPress admin menu. The full-bleed negative margins were sized to cancel a horizontal padding that #wpbody-content does not have — the gutter belongs to #wpcontent — so the canvas hung 20px past the column on both sides and put the admin page into horizontal overflow.
@@ -131,6 +135,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.3.4 =
+The settings page is now a top-level "Custom Admin" item in the admin sidebar instead of a Settings submenu, which was unreachable on sites where the Settings flyout runs past the bottom of the screen. Old URLs redirect.
 
 = 1.3.3 =
 Fixes the Dashboard Canvas covering the admin menu, and makes canvas stylesheet updates cache-bust correctly. If you are upgrading from 1.3.x, purge any page/CSS caching plugin once after updating.
