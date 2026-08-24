@@ -517,6 +517,7 @@ final class OneDog_BB_REST {
 			'canvas_enable_squash' => (bool) get_option( 'onedog_bbca_canvas_enable_squash', false ),
 			'canvas_hide_wp_branding' => (bool) get_option( 'onedog_bbca_canvas_hide_wp_branding', false ),
 			'canvas_full_bleed_rows' => (bool) get_option( 'onedog_bbca_canvas_full_bleed_rows', false ),
+			'canvas_load_theme_styles' => (bool) get_option( 'onedog_bbca_canvas_load_theme_styles', false ),
 		];
 
 		// Export all role capabilities.
@@ -577,6 +578,9 @@ final class OneDog_BB_REST {
 		}
 		if ( isset( $config['canvas_full_bleed_rows'] ) ) {
 			update_option( 'onedog_bbca_canvas_full_bleed_rows', ! empty( $config['canvas_full_bleed_rows'] ) );
+		}
+		if ( isset( $config['canvas_load_theme_styles'] ) ) {
+			update_option( 'onedog_bbca_canvas_load_theme_styles', ! empty( $config['canvas_load_theme_styles'] ) );
 		}
 
 		return rest_ensure_response( [ 'success' => true ] );
@@ -818,6 +822,7 @@ final class OneDog_BB_REST {
 				'enable_squash'     => (bool) get_option( 'onedog_bbca_canvas_enable_squash', false ),
 				'hide_wp_branding'  => (bool) get_option( 'onedog_bbca_canvas_hide_wp_branding', false ),
 				'full_bleed_rows'   => (bool) get_option( 'onedog_bbca_canvas_full_bleed_rows', false ),
+				'load_theme_styles' => (bool) get_option( 'onedog_bbca_canvas_load_theme_styles', false ),
 			],
 		] );
 	}
@@ -848,6 +853,7 @@ final class OneDog_BB_REST {
 		update_option( 'onedog_bbca_canvas_enable_squash', ! empty( $settings['enable_squash'] ) );
 		update_option( 'onedog_bbca_canvas_hide_wp_branding', ! empty( $settings['hide_wp_branding'] ) );
 		update_option( 'onedog_bbca_canvas_full_bleed_rows', ! empty( $settings['full_bleed_rows'] ) );
+		update_option( 'onedog_bbca_canvas_load_theme_styles', ! empty( $settings['load_theme_styles'] ) );
 
 		return rest_ensure_response( [ 'success' => true ] );
 	}
