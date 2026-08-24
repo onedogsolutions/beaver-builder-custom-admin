@@ -55,6 +55,8 @@ So the left `-20px` pulled the canvas out of the content column and onto the adm
 |--------|------|---------|
 | `onedog_bbca_canvas_full_bleed_rows` | bool | Override Beaver Builder's fixed row width inside the canvas |
 
+**Released to `main`** via `claude/dashboard-content-offset-menu-hvihlr`. A distributable test build is produced with `bin/build-zip.sh`.
+
 **Not verified on a live site.** These changes were made from static analysis of the plugin, WordPress core (`common.css`, `admin-menu.css`, `admin-header.php`), Beaver Builder's CSS generator, and White Label CMS. Verification checklist, to run as a target role on `/wp-admin/index.php`:
 
 - `document.documentElement.scrollWidth - document.documentElement.clientWidth === 0`
@@ -66,6 +68,8 @@ So the left `-20px` pulled the canvas out of the content column and onto the adm
 - A non-target role has no `bbca-canvas-active` class on `<body>`
 
 Purge LiteSpeed Cache once after deploying — mtime versioning fixes future edits, but the already-optimized combined CSS has to be dropped by hand.
+
+**Also check the settings UI**, since the Full-Bleed Rows toggle is new: Settings → Custom Admin → Dashboard Canvas should show a "Row Width" card, and toggling it should persist across a reload and survive an export/import round trip.
 
 ---
 
@@ -425,6 +429,7 @@ Forked from [helloideabox/beaver-builder-dashboard-welcome](https://github.com/h
 - **Author:** Ryan Waterbury, One Dog Solutions — https://onedog.solutions/
 - **License:** GPL-2.0, matching upstream and WordPress core.
 - **Build:** `@wordpress/scripts` + Tailwind CSS v4. `build/` is committed; `node_modules/` is not.
+- **Packaging:** `bin/build-zip.sh` produces `dist/beaver-builder-custom-admin-<version>.zip` from the working tree — runtime files only (`build/`, `classes/`, `includes/`, `assets/`, the bootstrap, `readme.txt`, `LICENSE`). Source, tooling, and `STATE.md` are excluded. `*.zip` and `dist/` are gitignored.
 - **JS:** React via WordPress packages for admin UI; vanilla ES2020+ for frontend. No jQuery.
 - **CSS:** Tailwind CSS v4 utility-first framework.
 - **REST namespace:** `onedog-bbca/v1`.

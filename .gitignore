@@ -43,3 +43,6 @@ coverage/
 
 # Misc
 *.tgz
+
+# Distribution staging
+dist/
