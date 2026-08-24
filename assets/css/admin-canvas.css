@@ -1,34 +1,88 @@
 /**
- * Beaver Builder Custom Admin — Dashboard Canvas Full-Bleed Styles
+ * Beaver Builder Custom Admin — Dashboard Canvas Layout
  *
- * Removes default WordPress admin margins, screen option links,
- * and layout gaps on /wp-admin/index.php to achieve edge-to-edge
- * Beaver Builder layout rendering.
+ * Renders the assigned Beaver Builder layout edge-to-edge inside the
+ * wp-admin content column on /wp-admin/index.php.
+ *
+ * All layout rules are scoped to `body.bbca-canvas-active`, which the
+ * module adds via `admin_body_class` only when the canvas is actually
+ * active for the current user — not to `body.index-php`, which is the
+ * screen rather than the feature.
  *
  * @since 1.3.0
  * @package OneDog\BBCustomAdmin
  */
 
-/* Edge-to-edge layout styling on wp-admin/index.php */
-body.index-php #wpbody-content {
-	padding-bottom: 0 !important;
+/* ---------------------------------------------------------------------
+ * Admin column reset
+ *
+ * WordPress puts the only horizontal gutter on #wpcontent
+ * (`padding-left: 20px`). #wpbody-content has no horizontal padding at
+ * all — only `padding-bottom: 65px`. Full bleed is therefore achieved by
+ * removing that gutter from the column, never by out-denting the canvas
+ * with negative margins: a negative left margin pulls the canvas onto
+ * the admin menu strip, and a negative right margin has no padding to
+ * consume and simply overflows the viewport.
+ *
+ * Zeroing the padding is also correct when the menu is folded
+ * (`.folded #wpcontent { margin-left: 36px }`) because no menu width is
+ * assumed anywhere in this file.
+ * ------------------------------------------------------------------ */
+body.bbca-canvas-active #wpcontent {
+	padding-left: 0;
 }
 
-/* Hide standard dashboard elements and widgets */
-body.index-php #wpbody-content > div:not(#bbca-custom-dashboard-canvas),
-body.index-php #screen-meta-links,
-body.index-php #screen-meta,
-body.index-php #wpbody-content > .wrap {
+/**
+ * #wpfooter is `position: absolute; bottom: 0`. Core reserves this 65px
+ * so the footer does not sit on top of the content — keep it.
+ */
+body.bbca-canvas-active #wpbody-content {
+	padding-bottom: 65px;
+}
+
+/**
+ * Hide the native dashboard and its screen-options chrome.
+ *
+ * `> *` rather than `> div` because some plugins emit non-div markup as
+ * a direct child of #wpbody-content. This covers #screen-meta,
+ * #screen-meta-links and .wrap, all of which are direct children.
+ */
+body.bbca-canvas-active #wpbody-content > *:not( #bbca-custom-dashboard-canvas ) {
 	display: none !important;
 }
 
-/* Full-bleed custom canvas container */
+/* ---------------------------------------------------------------------
+ * Canvas container
+ * ------------------------------------------------------------------ */
 #bbca-custom-dashboard-canvas {
+	width: 100%;
+	max-width: 100%;
 	background: #f0f0f1;
-	min-height: calc(100vh - 32px);
+
+	/**
+	 * Core publishes the toolbar height as a custom property on <html>
+	 * and switches it to 46px below 782px, so don't hardcode 32.
+	 */
+	min-height: calc( 100vh - var( --wp-admin--admin-bar--height, 32px ) );
+
+	/**
+	 * Regression guard. A layout wider than the admin column would put
+	 * the whole admin document into horizontal overflow, which makes the
+	 * menu appear to be covered: #adminmenuback is `position: fixed` and
+	 * stays put while #adminmenuwrap is in flow and scrolls away.
+	 *
+	 * `clip` rather than `hidden` deliberately — `overflow-x: hidden`
+	 * would force overflow-y to `auto` and give the canvas its own
+	 * scrollbar, breaking `position: sticky` inside the layout.
+	 */
+	overflow-x: clip;
+
+	-webkit-font-smoothing: antialiased;
 }
 
-/* BB content resets within the canvas */
+/* ---------------------------------------------------------------------
+ * Beaver Builder content resets within the canvas
+ * ------------------------------------------------------------------ */
 #bbca-custom-dashboard-canvas .fl-builder-content ul,
 #bbca-custom-dashboard-canvas .fl-builder-content ol {
 	list-style: inherit;
@@ -47,8 +101,4 @@ body.index-php #wpbody-content > .wrap {
 #bbca-custom-dashboard-canvas button:focus {
 	-webkit-box-shadow: none;
 	box-shadow: none;
-}
-
-#bbca-custom-dashboard-canvas {
-	-webkit-font-smoothing: antialiased;
 }

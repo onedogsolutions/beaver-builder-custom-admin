@@ -18,6 +18,8 @@ export default function DashboardCanvas( { showToast } ) {
 		target_roles: [],
 		enable_squash: false,
 		hide_wp_branding: false,
+		full_bleed_rows: false,
+		load_theme_styles: false,
 	} );
 	const [ layouts, setLayouts ] = useState( [] );
 	const [ roles, setRoles ] = useState( {} );
@@ -38,6 +40,8 @@ export default function DashboardCanvas( { showToast } ) {
 				target_roles: [],
 				enable_squash: false,
 				hide_wp_branding: false,
+				full_bleed_rows: false,
+				load_theme_styles: false,
 			} );
 			setLayouts( layoutData.layouts || [] );
 			setRoles( layoutData.roles || {} );
@@ -254,6 +258,97 @@ export default function DashboardCanvas( { showToast } ) {
 							/>
 						</button>
 					</div>
+				</div>
+			</div>
+
+			{ /* Full-Bleed Rows Toggle */ }
+			<div className="bg-white rounded-lg shadow-sm border border-gray-200">
+				<div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+					<h3 className="text-sm font-semibold text-gray-900">
+						{ __( 'Row Width', 'bb-custom-admin' ) }
+					</h3>
+					<p className="text-xs text-gray-500 mt-1">
+						{ __( 'By default the layout honours the fixed row width set in Beaver Builder’s global settings, which leaves a gutter on each side of the dashboard.', 'bb-custom-admin' ) }
+					</p>
+				</div>
+				<div className="p-4">
+					<div className="flex items-center justify-between max-w-md">
+						<div>
+							<p className="text-sm font-medium text-gray-900">
+								{ __( 'Full-Bleed Rows', 'bb-custom-admin' ) }
+							</p>
+							<p className="text-sm text-gray-500">
+								{ __( 'Let rows fill the full width of the admin content column instead. Only affects the dashboard canvas — the layout renders unchanged on the front end.', 'bb-custom-admin' ) }
+							</p>
+						</div>
+						<button
+							type="button"
+							onClick={ () => setSettings( ( p ) => ( {
+								...p,
+								full_bleed_rows: ! p.full_bleed_rows,
+							} ) ) }
+							className={ `relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
+								settings.full_bleed_rows ? 'bg-indigo-600' : 'bg-gray-200'
+							}` }
+							role="switch"
+							aria-checked={ settings.full_bleed_rows }
+						>
+							<span
+								className={ `pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+									settings.full_bleed_rows ? 'translate-x-5' : 'translate-x-0'
+								}` }
+							/>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			{ /* Theme Styles Toggle */ }
+			<div className="bg-white rounded-lg shadow-sm border border-gray-200">
+				<div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+					<h3 className="text-sm font-semibold text-gray-900">
+						{ __( 'Theme Styles', 'bb-custom-admin' ) }
+					</h3>
+					<p className="text-xs text-gray-500 mt-1">
+						{ __( 'Beaver Builder’s own layout, global and font styles are always loaded on the dashboard. Your theme’s stylesheet is not.', 'bb-custom-admin' ) }
+					</p>
+				</div>
+				<div className="p-4">
+					<div className="flex items-center justify-between max-w-md">
+						<div>
+							<p className="text-sm font-medium text-gray-900">
+								{ __( 'Load Theme Stylesheet', 'bb-custom-admin' ) }
+							</p>
+							<p className="text-sm text-gray-500">
+								{ __( 'Enable only if the layout still looks wrong — for example if your buttons take their colours from the Beaver Builder Theme customizer rather than from Beaver Builder’s global styles.', 'bb-custom-admin' ) }
+							</p>
+						</div>
+						<button
+							type="button"
+							onClick={ () => setSettings( ( p ) => ( {
+								...p,
+								load_theme_styles: ! p.load_theme_styles,
+							} ) ) }
+							className={ `relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
+								settings.load_theme_styles ? 'bg-indigo-600' : 'bg-gray-200'
+							}` }
+							role="switch"
+							aria-checked={ settings.load_theme_styles }
+						>
+							<span
+								className={ `pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+									settings.load_theme_styles ? 'translate-x-5' : 'translate-x-0'
+								}` }
+							/>
+						</button>
+					</div>
+					{ settings.load_theme_styles && (
+						<div className="mt-3 rounded-md bg-amber-50 border border-amber-200 p-3 max-w-md">
+							<p className="text-xs text-amber-800">
+								{ __( 'Theme stylesheets are written for the front end, so this also restyles the admin menu, toolbar and footer. If the admin looks off after saving, turn it back off.', 'bb-custom-admin' ) }
+							</p>
+						</div>
+					) }
 				</div>
 			</div>
 

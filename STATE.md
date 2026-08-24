@@ -2,9 +2,195 @@
 
 ## Release state
 
-**`main` is at v1.3.2** as of the Dashboard Canvas layout fix. Previous: v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.3.6** as of the settings-page return to the Settings menu. Previous: v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.2 (Dashboard Canvas Layout Fix)
+## Current Phase: v1.3.6 (Settings Page Returned to the Settings Menu)
+
+### v1.3.6 Modifications
+
+**Requested: put the settings page back under Settings, where it lived until v1.3.4.**
+
+v1.3.4 moved it out to a top-level "Custom Admin" sidebar item because on the target site it could not be reached: `add_options_page()` appends, the page was registered at `admin_menu` priority 25 so it was the last entry in the Settings submenu, and that submenu is taller than the viewport on a site carrying a normal plugin load-out. The flyout ran off the bottom of the screen and the final entries — this one among them — were not hoverable. Reverting the parent alone would reproduce that exactly, so the position within the submenu is part of this change.
+
+**Changes applied:**
+
+1. **Back to a Settings submenu** — `add_options_page()` in place of `add_menu_page()`. The dashicon and the `80.7` position argument go with it; a submenu item has neither.
+2. **Registered at `admin_menu` priority 9, not 25** — this is the part that keeps 1.3.4's bug from coming back. Core builds its own menus before `admin_menu` fires, and plugins overwhelmingly register on the default priority 10, so priority 9 lands this page immediately after core's Settings entries and ahead of the plugin block instead of at the end of it. Reachability no longer depends on how many other plugins have claimed the Settings menu, only on the flyout's first screenful — which core's own entries already fit inside.
+3. **Redirect reversed** — `onedog_bbca_redirect_legacy_settings_url()` now sends `admin.php?page=onedog-bbca-settings` to `options-general.php?page=onedog-bbca-settings`. It is the mirror of the 1.3.4 redirect, and it matters more than the original did: while the page was top-level, `admin.php` was the URL the settings page itself linked to and the one anyone would have bookmarked, and without the redirect that URL is a "Sorry, you are not allowed to access this page" screen rather than a 404. Any Menu Restrictor rule stored against the top-level slug follows the same path.
+4. **Asset enqueue hook suffix** — `settings_page_onedog-bbca-settings` is matched first again, with `toplevel_page_*` kept as the fallback. Both suffixes stay in the list, so the page renders its React app whichever parent it ends up under.
+
+**Trade-off, recorded deliberately:** the failure mode 1.3.4 was written to fix is a property of the Settings menu, not of this plugin, and priority 9 mitigates it rather than removing it. If a future plugin also registers ahead of the default block and pushes this entry down, or if a site's Settings menu grows past a screenful of core entries alone, the flyout can clip it again. The top-level registration is one line away in git history, and the enqueue guard still accepts that hook suffix.
+
+### Verification
+
+`php -l` clean. Traced by hand against core's menu construction: `add_options_page()` at priority 9 appends to `$submenu['options-general.php']` after the core entries registered in `wp-admin/menu.php` (which runs before `admin_menu` fires) and before anything registered at priority 10 or later; the resulting hook suffix is `settings_page_onedog-bbca-settings`, which the enqueue guard matches. The redirect cannot loop — it fires only when `$pagenow` is `admin.php` and targets `options-general.php`, where the guard returns early.
+
+**Not yet verified on the target site.** The one thing worth checking there is position: whether "Custom Admin" lands high enough in the Settings flyout to be hoverable on that install's plugin load-out. That is the whole risk of this release.
+
+### Files Modified (v1.3.6)
+
+- `beaver-builder-custom-admin.php` — `onedog_bbca_admin_menu()` uses `add_options_page()` on `admin_menu` priority 9; `onedog_bbca_redirect_legacy_settings_url()` reversed to send `admin.php` to `options-general.php`; enqueue hook-suffix order and comment; version `1.3.6`.
+- `package.json` — Version `1.3.6`.
+- `readme.txt` — Stable tag, changelog, upgrade notice. The Description, Installation and FAQ copy already said "Settings → Custom Admin" and is accurate again without edits.
+- `STATE.md` — This section.
+
+`build/` is unchanged — this release touches no JavaScript, and no settings-UI copy names the menu location.
+
+### Release
+
+Merged to `main` and packaged for testing: `dist/beaver-builder-custom-admin-1.3.6.zip`.
+
+**Testing this build.** Install the zip, then confirm in order: "Custom Admin" appears in the Settings flyout and sits high enough in it to click without the list scrolling off-screen; it opens the React settings app with all tabs intact; `admin.php?page=onedog-bbca-settings` redirects to `options-general.php?page=onedog-bbca-settings` rather than showing a permissions error; and the settings page still loads its CSS and JS (an unstyled or empty page means the hook-suffix match is wrong).
+
+---
+
+## Historical Phase: v1.3.5 (Admin Canvas Styling Assets)
+
+### v1.3.5 Modifications
+
+**Fixed: Beaver Builder styling was incomplete on the dashboard canvas — most visibly, buttons rendered without their hover state.**
+
+**Root cause — the canvas loaded the layout's stylesheet and nothing else.** Since v1.3.3 `enqueue_assets()` has called `FLBuilder::register_layout_styles_scripts()` and `FLBuilder::enqueue_layout_styles_scripts()`, which between them cover the shared frontend bundle and the layout's own cached CSS/JS. On the front end a layout is styled by more than that: Global Styles (BB 2.5+), the Custom CSS from Global Settings, Google Fonts, Beaver Themer's assets, and the active theme's stylesheet. Every one of those is registered on `wp_enqueue_scripts`, or by the theme — and **`wp_enqueue_scripts` never fires in wp-admin**. Nothing in the module substituted for it.
+
+That explains why the symptom was specific to hover rather than general. A Button module with per-node colours has its `.fl-node-xxxx .fl-button:hover` rule inside the cached layout file, which the canvas already loaded, so it worked. A button inheriting its colours from Global Styles has no per-node hover rule at all — the declaration lives in the global stylesheet, which the admin document never received. Admin CSS was not overriding anything; the rule was simply absent.
+
+**Fixes applied:**
+
+1. **Front-end enqueue replay** — `replay_frontend_enqueue()` walks the registered `wp_enqueue_scripts` callbacks in priority order and invokes the ones Beaver Builder owns, inside the assigned layout's post-ID scope. This is deliberately not a list of hardcoded method names: Beaver Builder is commercial, its internals carry no versioning guarantee, and the Global Styles API in particular has moved between releases. Callbacks are matched by **owning class** (`FLBuilder*`, `FLThemeBuilder*`), so an upstream rename costs the canvas one stylesheet instead of fataling. Closures and plain functions are unattributable and are never invoked — replaying an unidentified front-end callback in wp-admin is exactly the side effect this must not introduce.
+2. **`FLBuilder::register_layout_styles_scripts()` / `enqueue_layout_styles_scripts()` are skipped during the replay**, since `enqueue_assets()` calls both directly. Without the skip list their inline CSS would be appended twice.
+3. **Global Settings Custom CSS** — `enqueue_global_settings_css()` inlines it on the canvas handle. Some Beaver Builder versions fold it into the layout cache file and some do not; when it is already there this is a duplicate of rules that print later and still win, which is harmless.
+4. **Cache-miss render** — `maybe_render_layout_css()` calls `FLBuilder::render_css()` when `get_asset_info()` reports the cache file is absent. Beaver Builder regenerates that file lazily on a front-end render, so on a fresh install, or on the first dashboard hit after someone clears the builder cache, the enqueued stylesheet was a 404 and the canvas rendered unstyled. The call is output-buffered: some versions echo the CSS as well as writing it, and `admin_enqueue_scripts` fires inside `<head>`.
+5. **Theme Styles option** (`onedog_bbca_canvas_load_theme_styles`, default off) — enqueues `get_stylesheet_uri()` and replays the theme's own front-end callbacks. On a Beaver Builder Theme site the button colours, hover included, are customizer values in the theme's generated stylesheet, so a layout leaning on them cannot be styled correctly without it. It is opt-in because theme CSS is written for a front-end document: its `body`, `a` and heading rules restyle the admin menu, toolbar and footer too. The settings UI says so, and shows a warning once the toggle is on.
+6. **`with_post_id()`** — the `set_post_id()` / `reset_post_id()` dance that v1.3.3 inlined in `enqueue_layout_assets()` is now a helper wrapping the whole block, with the pop in a `finally`. Upstream those calls are a stack, so nesting is safe.
+7. **`guard()`** — every call into Beaver Builder internals runs through it. This code executes on the dashboard, the one admin screen every user lands on; an upstream rename must cost the site its canvas styling, never its ability to log in and fix the problem. Failures are logged under `WP_DEBUG` and are otherwise silent.
+8. **`?bbca_debug_styles=1`** — administrators-only diagnostic, registered on both `admin_print_footer_scripts` and `wp_footer`, printing the request's stylesheet handles as an HTML comment. Diagnosing this class of bug means diffing the dashboard's head against a front-end render of the same layout; this makes that possible without editing code.
+
+### Verification
+
+Exercised against a stubbed WordPress + Beaver Builder harness covering: layout assigned, cache file missing, theme toggle on, full-bleed on, no layout assigned, layout deleted, and a degraded install with `FLBuilderModel` absent and no front-end callbacks registered. Confirmed in every case — replay order follows hook priority, the post-ID stack is balanced (including when a callback throws), a throwing callback is logged and the remaining sources still load, third-party and closure callbacks are never invoked, the theme pass does not re-run Beaver Builder callbacks, and `render_css()` output never escapes into the document.
+
+**Not yet verified on the target site.** Which of these sources was actually missing is a question only the live install answers — that is what `?bbca_debug_styles=1` is for. If hover is still wrong after this, the diff between the dashboard and a front-end render names the remaining source, and the Theme Styles toggle is the next thing to try.
+
+### Files Modified (v1.3.5)
+
+- `includes/modules/class-dashboard-canvas.php` — `THEME_STYLES_OPTION` and `DEBUG_STYLES_ARG` constants, `$replayed` registry, `enqueue_layout_stack()`, `replay_frontend_enqueue()`, `callback_id()`, `owns_layout_assets()`, `enqueue_global_settings_css()`, `maybe_render_layout_css()`, `enqueue_theme_styles()`, `with_post_id()`, `guard()`, `maybe_debug_styles()`; `enqueue_assets()` and `enqueue_layout_assets()` rewritten.
+- `classes/class-onedog-bb-rest.php` — `load_theme_styles` in the canvas GET/POST endpoints and in the export/import payloads.
+- `src/components/DashboardCanvas.jsx` — Theme Styles toggle card and its warning, plus the new key in both defaults objects.
+- `build/` — rebuilt.
+- `beaver-builder-custom-admin.php`, `package.json`, `readme.txt` — version 1.3.5, changelog.
+- `PLAN-1.3.5-canvas-styling-assets.md` — the plan this implements.
+
+### Release
+
+Merged to `main` and packaged for testing: `dist/beaver-builder-custom-admin-1.3.5.zip`, 21 files, 64K. Contents spot-checked — runtime files only, with `src/`, `node_modules/`, `bin/`, `STATE.md` and the plan document all correctly excluded by `bin/build-zip.sh`.
+
+**Testing this build.** Install the zip, then before looking at anything else load `/wp-admin/index.php?bbca_debug_styles=1` and a front-end page rendering the same layout with the same argument, and diff the `bbca-debug-styles` HTML comment in each. That diff is the ground truth for whether the fix reached the right stylesheets, and it is worth capturing here even if the buttons now look correct — the root-cause analysis above is inference from the codebase, not from the live install.
+
+Then check, in order: button hover on a button inheriting global colours; typography against the front end; that the admin menu, toolbar and footer are visually unchanged; and that `?bbca_bypass=1` still returns the native dashboard. If hover is still wrong, the missing source will be named in the stylesheet diff, and the Theme Styles toggle is the next thing to try — expect it to restyle the admin chrome when enabled.
+
+## Historical Phase: v1.3.4 (Settings Page Menu Relocation)
+
+### v1.3.4 Modifications
+
+**Fixed: the settings page could not be reached on ott-dev.onedog.solutions.**
+
+**Root cause — the page was the last entry in a flyout taller than the viewport.** `onedog_bbca_admin_menu()` registered the page with `add_options_page()`, which appends to the Settings submenu, on `admin_menu` at priority 25. On a site carrying a normal plugin load-out (the target site adds Connectors, FluentSMTP, HappyFiles, LiteSpeed Cache, WPCodeBox and others to Settings) that submenu is taller than the screen, so the flyout runs off the bottom of the viewport and the entries at its end — this one among them — are not reachable by hover.
+
+Nothing was removing the page. It was registered, and `options-general.php?page=onedog-bbca-settings` loaded it correctly the whole time; only the sidebar affordance was missing. This was reported alongside "we do not have the 1.3.3 version", but the site was already running 1.3.3 — the two symptoms were one problem: the 1.3.3 settings (the new Row Width card) were behind a menu entry that could not be clicked.
+
+**Fixes applied:**
+
+1. **Top-level menu item** — `add_menu_page()` with the `dashicons-admin-customizer` icon at position `80.7`, placing "Custom Admin" directly after Settings in the sidebar. A top-level item does not depend on flyout height or on how many other plugins have claimed the parent menu.
+2. **Fractional position** — `80.7` rather than `81`, since WordPress keys `$menu` by position and an integer collision silently overwrites whichever plugin registered second.
+3. **Legacy URL redirect** — `onedog_bbca_redirect_legacy_settings_url()` on `admin_init` sends `options-general.php?page=onedog-bbca-settings` to `admin.php?page=onedog-bbca-settings`, so existing bookmarks and any stored Menu Restrictor rules pointing at the old parent keep working.
+4. **Asset enqueue hook suffix** — `onedog_bbca_enqueue_settings_assets()` matched the literal `settings_page_onedog-bbca-settings`, which the top-level page no longer produces; it now matches `toplevel_page_*` and keeps the old suffix as a fallback. Without this the page would have rendered an empty React root.
+
+The menu slug is now the `BBCA_MENU_SLUG` constant rather than a string repeated across the registration, the redirect, and the enqueue guard.
+
+**Files changed:**
+- `beaver-builder-custom-admin.php` — `BBCA_MENU_SLUG`, `add_menu_page()` in place of `add_options_page()`, legacy redirect, hook-suffix match, version `1.3.4`.
+- `package.json` — Version `1.3.4`.
+- `readme.txt` — Stable tag, changelog, upgrade notice.
+- `STATE.md` — This section.
+
+`build/` is unchanged — this release touches no JavaScript.
+
+**Released to `main`** via `claude/admin-menu-version-access-hhxlc0`. A distributable build is produced with `bin/build-zip.sh`.
+
+**Verification on the live site:** "Custom Admin" appears as a top-level sidebar item below Settings; it opens the React settings app with the Dashboard Canvas tab and its 1.3.3 "Row Width" card; and `options-general.php?page=onedog-bbca-settings` redirects to `admin.php?page=onedog-bbca-settings` rather than erroring.
+
+---
+
+## Historical Phase: v1.3.3 (Dashboard Canvas Admin-Menu Overlap Fix)
+
+### v1.3.3 Modifications
+
+**Fixed the Dashboard Canvas overlapping the WordPress admin menu.**
+
+**Root cause — the full-bleed margin was mis-targeted.** `assets/css/admin-canvas.css` carried `margin: -20px -20px 0 -20px` on `#bbca-custom-dashboard-canvas`, commented as countering "default `#wpbody-content` padding." That padding does not exist. WordPress core sets:
+
+```css
+#wpcontent      { margin-left: 160px; padding-left: 20px; }   /* the only horizontal gutter */
+#wpbody-content { padding-bottom: 65px; float: left; width: 100%; }  /* no horizontal padding */
+```
+
+So the left `-20px` pulled the canvas out of the content column and onto the admin menu strip, and the right `-20px` had no padding to consume and simply extended the canvas 20px past the viewport — putting the whole admin document into horizontal overflow.
+
+**Why that reads as "covering the menu."** Core paints the menu in two pieces with different scroll behaviour: `#adminmenuback` (the dark strip) is `position: fixed; z-index: 1` and never scrolls, while `#adminmenuwrap` (the clickable list) is `position: relative; float: left; z-index: 9990` and is in normal flow. Under horizontal overflow the menu items slide out from under their own background. Beaver Builder compounds it — `.fl-row-bg-overlay .fl-row-content` ships `position: relative; z-index: 1`, which ties `#adminmenuback` and wins on DOM order.
+
+**Why removing the margin in `3244e88` appeared to change nothing.** That commit touched only the CSS file. The stylesheet is cache-busted with `BBCA_VER`, which `8b21b2c` had already set to `1.3.2`, so `admin-canvas.css?ver=1.3.2` kept resolving to the cached copy containing the negative margin — in the browser and in LiteSpeed Cache's optimized CSS.
+
+**Fixes applied:**
+
+1. **Cache-busting** — `enqueue_assets()` now versions the canvas stylesheet with `filemtime()`, so CSS edits bust caches without a version bump.
+2. **Correct full-bleed** — negative margins are gone. `body.bbca-canvas-active #wpcontent { padding-left: 0 }` removes the gutter from the column instead of out-denting the canvas. No menu width is assumed anywhere, so this is also correct when the menu is folded (`.folded #wpcontent { margin-left: 36px }`).
+3. **Head-time Beaver Builder assets** — `enqueue_assets()` now calls `FLBuilder::enqueue_layout_styles_scripts()` for the assigned layout (wrapped in `FLBuilderModel::set_post_id()` / `reset_post_id()`, all guarded by `method_exists`). Previously the layout stylesheet was first enqueued by `FLBuilderShortcode::insert()` during `render_canvas()` on `all_admin_notices` (`admin-header.php:321`), long after `admin_print_styles` (`:137`), so it was deferred to the footer and the layout's row/column width rules were missing on first paint.
+4. **Feature-scoped CSS** — a new `admin_body_class` filter adds `bbca-canvas-active`. All canvas, squash, and branding CSS is scoped to that class rather than `body.index-php`, which is the screen rather than the feature.
+5. **Footer clearance restored** — `padding-bottom: 0 !important` on `#wpbody-content` removed the 65px core reserves for `#wpfooter` (`position: absolute; bottom: 0`), which then sat on top of the canvas.
+6. **Responsive admin bar** — `min-height` now reads `var( --wp-admin--admin-bar--height, 32px )`, which core defines on `html` and switches to `46px` below 782px, instead of hardcoding 32px.
+7. **Overflow guard** — `overflow-x: clip` on the canvas contains any layout wider than the admin column. `clip` rather than `hidden` deliberately: `overflow-x: hidden` forces `overflow-y` to `auto`, which would give the canvas its own scrollbar and break `position: sticky` inside the layout.
+8. **New "Full-Bleed Rows" option** — the ~157px gutters on each side of the dashboard were Beaver Builder's own global `.fl-row-fixed-width { max-width: <row_width>px }` (`class-fl-builder.php:1951`), not a bug. The new toggle emits `#bbca-custom-dashboard-canvas .fl-row-fixed-width { max-width: 100% }` as inline style so rows fill the admin column. Defaults to off; the layout is unaffected on the front end.
+
+**Known limitation (not fixed):** Beaver Builder's responsive breakpoints are viewport-width media queries, but the canvas is 160px (or 36px folded) narrower than the viewport, so the layout switches to its medium/mobile treatment about a menu-width late. There is no clean fix short of container queries — set the layout's BB global row width with that offset in mind and test the folded menu.
+
+**Correction to the v1.3.2 record below:** that entry attributes the breakage to the `in_admin_header` hook placement and says the negative margins were "countering the wrong container's padding." The hook change was correct and remains in place, but there was never a right container to counter — `#wpbody-content` has no horizontal padding on any WordPress version. The margins were wrong in both directions from the day they were written.
+
+**Files changed:**
+- `assets/css/admin-canvas.css` — Rewritten layout rules: no negative margins, feature-scoped selectors, footer clearance, responsive admin-bar height, overflow guard.
+- `assets/css/admin.css` — Deleted. Unreferenced since the Tailwind rebuild in v1.0.0.
+- `includes/modules/class-dashboard-canvas.php` — `FULL_BLEED_OPTION` and `BODY_CLASS` constants, `add_body_class()`, `enqueue_layout_assets()`, rewritten `enqueue_assets()`, body-class-scoped squash and branding CSS.
+- `classes/class-onedog-bb-rest.php` — `full_bleed_rows` in the `/dashboard-canvas` GET/POST handlers and in export/import.
+- `src/components/DashboardCanvas.jsx` — "Row Width" card with the Full-Bleed Rows toggle.
+- `beaver-builder-custom-admin.php`, `package.json` — Version `1.3.3`.
+- `readme.txt` — Stable tag, changelog, upgrade notice.
+- `build/*` — Regenerated.
+- `STATE.md` — This section.
+
+**New option key:**
+
+| Option | Type | Purpose |
+|--------|------|---------|
+| `onedog_bbca_canvas_full_bleed_rows` | bool | Override Beaver Builder's fixed row width inside the canvas |
+
+**Released to `main`** via `claude/dashboard-content-offset-menu-hvihlr`. A distributable test build is produced with `bin/build-zip.sh`.
+
+**Deployed to ott-dev.onedog.solutions, canvas checklist still unrun.** The site was confirmed running 1.3.3 during the v1.3.4 investigation, so these changes are live. The "admin menu is covered" report that followed the deploy turned out to be the settings-page access problem fixed in v1.3.4, not a canvas regression — it is not evidence either way about the layout fix below, which was made from static analysis of the plugin, WordPress core (`common.css`, `admin-menu.css`, `admin-header.php`), Beaver Builder's CSS generator, and White Label CMS. Verification checklist, still to run as a target role on `/wp-admin/index.php`:
+
+- `document.documentElement.scrollWidth - document.documentElement.clientWidth === 0`
+- Canvas left edge at x=160 unfolded and x=36 folded, via `getBoundingClientRect()`
+- Beaver Builder layout stylesheet present in `<head>`, no reflow on load
+- Admin footer below the canvas, not overlapping it
+- At a 700px viewport the min-height resolves against a 46px bar and the menu auto-folds without overlap
+- `?bbca_bypass=1` restores the native dashboard with core gutters intact
+- A non-target role has no `bbca-canvas-active` class on `<body>`
+
+Purge LiteSpeed Cache once after deploying — mtime versioning fixes future edits, but the already-optimized combined CSS has to be dropped by hand.
+
+**Also check the settings UI**, since the Full-Bleed Rows toggle is new: Custom Admin → Dashboard Canvas (a top-level sidebar item since v1.3.4; it was Settings → Custom Admin when this was written) should show a "Row Width" card, and toggling it should persist across a reload and survive an export/import round trip.
+
+---
+
+## Historical Phase: v1.3.2 (Dashboard Canvas Layout Fix)
 
 ### v1.3.2 Modifications
 
@@ -360,6 +546,7 @@ Forked from [helloideabox/beaver-builder-dashboard-welcome](https://github.com/h
 - **Author:** Ryan Waterbury, One Dog Solutions — https://onedog.solutions/
 - **License:** GPL-2.0, matching upstream and WordPress core.
 - **Build:** `@wordpress/scripts` + Tailwind CSS v4. `build/` is committed; `node_modules/` is not.
+- **Packaging:** `bin/build-zip.sh` produces `dist/beaver-builder-custom-admin-<version>.zip` from the working tree — runtime files only (`build/`, `classes/`, `includes/`, `assets/`, the bootstrap, `readme.txt`, `LICENSE`). Source, tooling, and `STATE.md` are excluded. `*.zip` and `dist/` are gitignored.
 - **JS:** React via WordPress packages for admin UI; vanilla ES2020+ for frontend. No jQuery.
 - **CSS:** Tailwind CSS v4 utility-first framework.
 - **REST namespace:** `onedog-bbca/v1`.

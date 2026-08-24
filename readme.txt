@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.2
+Stable tag: 1.3.6
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,35 @@ All data remains local to your WordPress installation.
 
 == Changelog ==
 
+= 1.3.6 =
+* The settings page has moved back to Settings → Custom Admin. It was a top-level "Custom Admin" sidebar item in 1.3.4 and 1.3.5.
+* It is now registered earlier than most plugins' Settings pages, so it appears near the top of the Settings submenu rather than at the end — that end position, in a flyout taller than the screen, is what made it unreachable before 1.3.4.
+* The 1.3.4-1.3.5 admin.php?page=onedog-bbca-settings URL now redirects to options-general.php?page=onedog-bbca-settings, so bookmarks made while the page was top-level keep working.
+
+= 1.3.5 =
+* Fixed missing Beaver Builder styling on the dashboard canvas — most visibly, buttons rendering without their hover state. The canvas loaded the layout's own cached stylesheet but nothing else: global styles, Google Fonts and Beaver Themer assets are all registered on wp_enqueue_scripts, which never fires in wp-admin, so a button taking its colours from global styles arrived with no hover rule at all.
+* Beaver Builder's front-end asset callbacks are now replayed on the dashboard, scoped to the assigned layout. Callbacks are matched by owning class rather than by hardcoded method name, so a Beaver Builder update that renames an internal costs the canvas that one stylesheet instead of fataling.
+* Custom CSS from Beaver Builder's Global Settings is now applied to the canvas.
+* The layout's cached stylesheet is regenerated if it is missing, so the dashboard is no longer unstyled on a fresh install or after clearing the builder cache.
+* New "Theme Styles" option, off by default: loads the active theme's stylesheet on the dashboard. Needed when button colours come from the Beaver Builder Theme customizer rather than from Beaver Builder's global styles. It also restyles the admin menu, toolbar and footer, which is why it is opt-in.
+* All calls into Beaver Builder internals are individually guarded — a failure disables canvas styling and is logged under WP_DEBUG, it never takes the dashboard down.
+* New diagnostic: administrators can append ?bbca_debug_styles=1 to the dashboard or to a front-end page to list the stylesheets that page loaded. Comparing the two lists identifies anything still missing.
+
+= 1.3.4 =
+* The settings page has moved from Settings → Custom Admin to its own top-level "Custom Admin" item in the admin sidebar. As a Settings submenu it was registered last, so on a site with a normal plugin load-out it sat below the bottom of the viewport in a flyout taller than the screen and could not be reached by hover.
+* The old options-general.php?page=onedog-bbca-settings URL now redirects to the new location, so existing bookmarks keep working.
+
+= 1.3.3 =
+* Fixed the Dashboard Canvas overlapping the WordPress admin menu. The full-bleed negative margins were sized to cancel a horizontal padding that #wpbody-content does not have — the gutter belongs to #wpcontent — so the canvas hung 20px past the column on both sides and put the admin page into horizontal overflow.
+* Full bleed is now achieved by zeroing #wpcontent's padding for the canvas only, which is also correct when the admin menu is folded.
+* The canvas stylesheet is now versioned by file modification time, so CSS changes bust browser and page caches without a plugin version bump.
+* Beaver Builder layout assets are now enqueued on admin_enqueue_scripts instead of during render, so the layout stylesheet reaches the document head and the dashboard no longer reflows on load.
+* New "Full-Bleed Rows" option: let rows fill the admin content column instead of Beaver Builder's global fixed row width.
+* Canvas CSS is now scoped to a dedicated body class (bbca-canvas-active) rather than body.index-php.
+* Restored the 65px bottom padding that WordPress reserves for the absolutely positioned admin footer.
+* The canvas minimum height now reads the admin bar height from core's --wp-admin--admin-bar--height custom property (46px on small screens) instead of hardcoding 32px.
+* Removed the unused assets/css/admin.css left over from the pre-Tailwind settings UI.
+
 = 1.3.2 =
 * Fixed Dashboard Canvas layout regression after Welcome Screen removal.
 * Canvas container is now injected inside #wpbody-content via all_admin_notices, restoring correct alignment and preventing #wpbody collapse.
@@ -120,6 +149,15 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.3.6 =
+The settings page returns to Settings → Custom Admin, registered near the top of the Settings submenu. Bookmarks to the 1.3.4-1.3.5 top-level URL redirect.
+
+= 1.3.4 =
+The settings page is now a top-level "Custom Admin" item in the admin sidebar instead of a Settings submenu, which was unreachable on sites where the Settings flyout runs past the bottom of the screen. Old URLs redirect.
+
+= 1.3.3 =
+Fixes the Dashboard Canvas covering the admin menu, and makes canvas stylesheet updates cache-bust correctly. If you are upgrading from 1.3.x, purge any page/CSS caching plugin once after updating.
 
 = 1.2.0 =
 The Option Cleaner has moved to a standalone plugin and is no longer part of this plugin. Also fixes the Menu Restrictor menu list not loading.

@@ -4,7 +4,7 @@
  * Description: Modular WordPress admin customization — full-bleed dashboard canvas, role/menu/toolbar visibility, notice cleaner, and 3rd-party squashing by user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
- * Version: 1.3.2
+ * Version: 1.3.6
  * Requires at least: 5.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '1.3.2' );
+define( 'BBCA_VER', '1.3.6' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );
@@ -43,7 +43,21 @@ function onedog_bbca_activate() {
 register_activation_hook( __FILE__, 'onedog_bbca_activate' );
 
 /**
- * Registers the settings admin page under Settings menu.
+ * Menu slug for the settings page.
+ *
+ * @since 1.3.4
+ */
+define( 'BBCA_MENU_SLUG', 'onedog-bbca-settings' );
+
+/**
+ * Registers the settings page as a Settings submenu item.
+ *
+ * Lives under Settings. It was a top-level item for 1.3.4-1.3.5, after
+ * the Settings flyout on a heavily-loaded site grew taller than the
+ * viewport and put this page - registered last, so at the bottom of the
+ * flyout - out of hover reach. It is registered here on `admin_menu` at
+ * priority 9 instead of 25 so it lands ahead of the plugins that use the
+ * default priority, rather than at the end of the flyout again.
  *
  * @since 0.2.0
  * @return void
@@ -53,11 +67,37 @@ function onedog_bbca_admin_menu() {
 		__( 'Custom Admin', 'bb-custom-admin' ),
 		__( 'Custom Admin', 'bb-custom-admin' ),
 		'manage_options',
-		'onedog-bbca-settings',
+		BBCA_MENU_SLUG,
 		'onedog_bbca_render_settings_page'
 	);
 }
-add_action( 'admin_menu', 'onedog_bbca_admin_menu', 25 );
+add_action( 'admin_menu', 'onedog_bbca_admin_menu', 9 );
+
+/**
+ * Redirects the 1.3.4-1.3.5 top-level URL to the Settings submenu.
+ *
+ * Mirrors the redirect 1.3.4 added in the other direction. Keeps
+ * bookmarks made while the page was top-level, and any Menu Restrictor
+ * rules stored against `admin.php`, working.
+ *
+ * @since 1.3.6
+ * @return void
+ */
+function onedog_bbca_redirect_legacy_settings_url() {
+	if ( 'admin.php' !== ( $GLOBALS['pagenow'] ?? '' ) ) {
+		return;
+	}
+
+	$page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+
+	if ( BBCA_MENU_SLUG !== $page ) {
+		return;
+	}
+
+	wp_safe_redirect( admin_url( 'options-general.php?page=' . BBCA_MENU_SLUG ) );
+	exit;
+}
+add_action( 'admin_init', 'onedog_bbca_redirect_legacy_settings_url' );
 
 /**
  * Renders the settings page root element for React.
@@ -77,7 +117,15 @@ function onedog_bbca_render_settings_page() {
  * @return void
  */
 function onedog_bbca_enqueue_settings_assets( $hook_suffix ) {
-	if ( 'settings_page_onedog-bbca-settings' !== $hook_suffix ) {
+	// 'settings_page_*' is the hook suffix for a Settings submenu page.
+	// 'toplevel_page_*' was the suffix while the page was top-level
+	// (1.3.4-1.3.5), kept so assets still load if anything re-parents it.
+	$hooks = [
+		'settings_page_' . BBCA_MENU_SLUG,
+		'toplevel_page_' . BBCA_MENU_SLUG,
+	];
+
+	if ( ! in_array( $hook_suffix, $hooks, true ) ) {
 		return;
 	}
 
