@@ -31,6 +31,8 @@ The menu slug is now the `BBCA_MENU_SLUG` constant rather than a string repeated
 
 `build/` is unchanged — this release touches no JavaScript.
 
+**Released to `main`** via `claude/admin-menu-version-access-hhxlc0`. A distributable build is produced with `bin/build-zip.sh`.
+
 **Verification on the live site:** "Custom Admin" appears as a top-level sidebar item below Settings; it opens the React settings app with the Dashboard Canvas tab and its 1.3.3 "Row Width" card; and `options-general.php?page=onedog-bbca-settings` redirects to `admin.php?page=onedog-bbca-settings` rather than erroring.
 
 ---
@@ -88,7 +90,7 @@ So the left `-20px` pulled the canvas out of the content column and onto the adm
 
 **Released to `main`** via `claude/dashboard-content-offset-menu-hvihlr`. A distributable test build is produced with `bin/build-zip.sh`.
 
-**Not verified on a live site.** These changes were made from static analysis of the plugin, WordPress core (`common.css`, `admin-menu.css`, `admin-header.php`), Beaver Builder's CSS generator, and White Label CMS. Verification checklist, to run as a target role on `/wp-admin/index.php`:
+**Deployed to ott-dev.onedog.solutions, canvas checklist still unrun.** The site was confirmed running 1.3.3 during the v1.3.4 investigation, so these changes are live. The "admin menu is covered" report that followed the deploy turned out to be the settings-page access problem fixed in v1.3.4, not a canvas regression — it is not evidence either way about the layout fix below, which was made from static analysis of the plugin, WordPress core (`common.css`, `admin-menu.css`, `admin-header.php`), Beaver Builder's CSS generator, and White Label CMS. Verification checklist, still to run as a target role on `/wp-admin/index.php`:
 
 - `document.documentElement.scrollWidth - document.documentElement.clientWidth === 0`
 - Canvas left edge at x=160 unfolded and x=36 folded, via `getBoundingClientRect()`
@@ -100,7 +102,7 @@ So the left `-20px` pulled the canvas out of the content column and onto the adm
 
 Purge LiteSpeed Cache once after deploying — mtime versioning fixes future edits, but the already-optimized combined CSS has to be dropped by hand.
 
-**Also check the settings UI**, since the Full-Bleed Rows toggle is new: Settings → Custom Admin → Dashboard Canvas should show a "Row Width" card, and toggling it should persist across a reload and survive an export/import round trip.
+**Also check the settings UI**, since the Full-Bleed Rows toggle is new: Custom Admin → Dashboard Canvas (a top-level sidebar item since v1.3.4; it was Settings → Custom Admin when this was written) should show a "Row Width" card, and toggling it should persist across a reload and survive an export/import round trip.
 
 ---
 
