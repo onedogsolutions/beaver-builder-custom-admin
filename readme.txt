@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.4
+Stable tag: 1.4.0
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,15 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.4.0 =
+* 3rd-Party Injection Squashing no longer modifies the admin bar. It removed every top-level node outside a small whitelist, which also caught the two container groups WordPress registers (root-default and top-secondary) — so the whitelisted items were orphaned at render time and the toolbar was gutted rather than trimmed. Squashing now only suppresses interruptions in the admin body, which is what it was meant to do.
+* Squashing now applies across wp-admin instead of only the dashboard, where the canvas already hid everything anyway.
+* Squashing no longer discards every admin notice. It now removes only notice callbacks defined by other plugins, so WordPress's own messages — settings saved, plugin activated, update failures — still reach the user.
+* Squashing no longer depends on Beaver Builder being active or a canvas layout being assigned.
+* Added popup/overlay suppression: promotional modals are hidden, removed from the DOM, and any page scroll lock they left behind is released.
+* Install, update, plugin, theme and Site Health screens are exempt from squashing, since their notices carry the results of what you just did.
+* New filters: onedog_bbca_squash_selectors to add popup selectors for a specific site, and onedog_bbca_squash_exempt_screens to change the exempt screen list.
 
 = 1.3.4 =
 * The settings page has moved from Settings → Custom Admin to its own top-level "Custom Admin" item in the admin sidebar. As a Settings submenu it was registered last, so on a site with a normal plugin load-out it sat below the bottom of the viewport in a flyout taller than the screen and could not be reached by hover.
@@ -135,6 +144,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+3rd-Party Injection Squashing no longer touches the admin bar, and now applies across wp-admin rather than only the dashboard. It also stops swallowing WordPress's own messages — only notices registered by other plugins are removed. If you had squashing enabled, review it after updating: its scope has changed.
 
 = 1.3.4 =
 The settings page is now a top-level "Custom Admin" item in the admin sidebar instead of a Settings submenu, which was unreachable on sites where the Settings flyout runs past the bottom of the screen. Old URLs redirect.

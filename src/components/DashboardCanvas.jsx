@@ -182,7 +182,7 @@ export default function DashboardCanvas( { showToast } ) {
 						{ __( '3rd-Party Injection Squashing', 'bb-custom-admin' ) }
 					</h3>
 					<p className="text-xs text-gray-500 mt-1">
-						{ __( 'Aggressively suppresses third-party admin notices, toolbar items, and dashboard widgets for targeted roles on the dashboard page.', 'bb-custom-admin' ) }
+						{ __( 'Suppresses the notices and popup overlays other plugins inject into the admin body, across all of wp-admin, for targeted roles. Leaves the admin bar and the admin menu untouched.', 'bb-custom-admin' ) }
 					</p>
 				</div>
 				<div className="p-4">
@@ -192,7 +192,7 @@ export default function DashboardCanvas( { showToast } ) {
 								{ __( 'Enable Squashing', 'bb-custom-admin' ) }
 							</p>
 							<p className="text-sm text-gray-500">
-								{ __( 'Output-buffers and discards all admin notices, strips non-essential toolbar nodes, and hides notice CSS.', 'bb-custom-admin' ) }
+								{ __( "Removes admin notices registered by other plugins and hides known popup overlays. WordPress's own messages are preserved, and install, update and plugin screens are exempt.", 'bb-custom-admin' ) }
 							</p>
 						</div>
 						<button
