@@ -1,10 +1,14 @@
 <?php
 /**
  * Plugin Name: Beaver Builder Custom Admin
- * Description: Modular WordPress admin customization — full-bleed dashboard canvas, role/menu/toolbar visibility, notice cleaner, and 3rd-party squashing by user role.
+ * Description: Modular WordPress admin customization — full-bleed dashboard canvas, role/menu/toolbar visibility, notice cleaner, column sorting, and 3rd-party squashing by user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
+<<<<<<< HEAD
  * Version: 1.3.6
+=======
+ * Version: 1.4.0
+>>>>>>> e5f408e (feat(column-sorting): add column sorting and filtering module)
  * Requires at least: 5.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
@@ -18,7 +22,11 @@
 
 defined( 'ABSPATH' ) || exit;
 
+<<<<<<< HEAD
 define( 'BBCA_VER', '1.3.6' );
+=======
+define( 'BBCA_VER', '1.4.0' );
+>>>>>>> e5f408e (feat(column-sorting): add column sorting and filtering module)
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );

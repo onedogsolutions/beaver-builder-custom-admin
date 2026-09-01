@@ -15,6 +15,7 @@ import MenuRestrictor from './MenuRestrictor';
 import ModuleSettings from './ModuleSettings';
 import ImportExport from './ImportExport';
 import DashboardCanvas from './DashboardCanvas';
+import ColumnSorting from './ColumnSorting';
 
 const TABS = [
 	{
@@ -28,6 +29,10 @@ const TABS = [
 	{
 		id: 'canvas',
 		label: __( 'Dashboard Canvas', 'bb-custom-admin' ),
+	},
+	{
+		id: 'sorting',
+		label: __( 'Column Sorting', 'bb-custom-admin' ),
 	},
 	{
 		id: 'modules',
@@ -125,6 +130,7 @@ export default function App() {
 				{ activeTab === 'roles' && <RoleEditor showToast={ showToast } /> }
 				{ activeTab === 'menus' && <MenuRestrictor showToast={ showToast } /> }
 				{ activeTab === 'canvas' && <DashboardCanvas showToast={ showToast } /> }
+				{ activeTab === 'sorting' && <ColumnSorting showToast={ showToast } /> }
 				{ activeTab === 'modules' && <ModuleSettings showToast={ showToast } /> }
 				{ activeTab === 'import-export' && <ImportExport showToast={ showToast } /> }
 			</div>

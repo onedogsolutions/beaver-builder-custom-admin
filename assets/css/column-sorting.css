@@ -1,0 +1,84 @@
+/**
+ * Beaver Builder Custom Admin — Column Sorting & Filtering Styles
+ *
+ * Styles for the smart filter dropdowns rendered on WordPress
+ * list table screens (posts, users, comments, media, CPTs).
+ *
+ * @since 1.4.0
+ * @package OneDog\BBCustomAdmin
+ */
+
+/* Filter dropdown base styling */
+.bbca-filter-select {
+	display: inline-block;
+	max-width: 200px;
+	margin: 0 4px 8px 0;
+	padding: 0 24px 0 8px;
+	font-size: 13px;
+	line-height: 2.2;
+	height: 30px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	background-color: #fff;
+	vertical-align: middle;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%23555%22%2F%3E%3C%2Fsvg%3E');
+	background-repeat: no-repeat;
+	background-position: right 5px top 55%;
+	background-size: 16px 16px;
+	cursor: pointer;
+}
+
+.bbca-filter-select:hover {
+	border-color: #2271b1;
+}
+
+.bbca-filter-select:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: 2px solid transparent;
+}
+
+/* Active filter highlight */
+.bbca-filter-select.bbca-filter-active {
+	border-color: #2271b1;
+	background-color: #f0f6fc;
+	font-weight: 600;
+}
+
+/* Clear Filters button */
+.bbca-clear-filters {
+	display: inline-block;
+	margin: 0 0 8px 4px;
+	padding: 0 10px;
+	font-size: 13px;
+	line-height: 2.15384615;
+	min-height: 30px;
+	vertical-align: middle;
+	border-radius: 4px;
+}
+
+.bbca-clear-filters::before {
+	content: "\f158";
+	font-family: dashicons;
+	margin-right: 4px;
+	vertical-align: middle;
+	font-size: 16px;
+	line-height: 1;
+}
+
+/* Responsive: stack filters on narrow screens */
+@media screen and (max-width: 782px) {
+	.bbca-filter-select {
+		max-width: 100%;
+		width: calc(50% - 8px);
+	}
+
+	.bbca-clear-filters {
+		display: block;
+		margin-top: 8px;
+		text-align: center;
+	}
+}

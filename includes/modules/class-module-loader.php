@@ -56,6 +56,7 @@ final class OneDog_BBCA_Module_Loader {
 			'menu-visibility'   => BBCA_DIR . 'includes/modules/class-menu-visibility.php',
 			'notice-cleaner'    => BBCA_DIR . 'includes/modules/class-notice-cleaner.php',
 			'dashboard-canvas'  => BBCA_DIR . 'includes/modules/class-dashboard-canvas.php',
+			'column-sorting'    => BBCA_DIR . 'includes/modules/class-column-sorting.php',
 		];
 	}
 
@@ -118,6 +119,10 @@ final class OneDog_BBCA_Module_Loader {
 			'dashboard-canvas' => [
 				'label'       => __( 'Dashboard Canvas', 'bb-custom-admin' ),
 				'description' => __( 'Replace the entire dashboard with a full-bleed Beaver Builder layout and squash 3rd-party injections.', 'bb-custom-admin' ),
+			],
+			'column-sorting' => [
+				'label'       => __( 'Column Sorting & Filtering', 'bb-custom-admin' ),
+				'description' => __( 'Make list table columns sortable and add smart filtering dropdowns to post, user, and comment screens.', 'bb-custom-admin' ),
 			],
 		];
 

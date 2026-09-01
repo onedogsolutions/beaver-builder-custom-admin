@@ -169,6 +169,20 @@ final class OneDog_BB_REST {
 				'permission_callback' => [ __CLASS__, 'check_permission' ],
 			],
 		] );
+
+		// Column Sorting & Filtering.
+		register_rest_route( self::NAMESPACE, '/column-sorting', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ __CLASS__, 'get_column_sorting' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ __CLASS__, 'save_column_sorting' ],
+				'permission_callback' => [ __CLASS__, 'check_permission' ],
+			],
+		] );
 	}
 
 	/**
@@ -516,8 +530,12 @@ final class OneDog_BB_REST {
 			'canvas_target_roles' => (array) get_option( 'onedog_bbca_canvas_target_roles', [] ),
 			'canvas_enable_squash' => (bool) get_option( 'onedog_bbca_canvas_enable_squash', false ),
 			'canvas_hide_wp_branding' => (bool) get_option( 'onedog_bbca_canvas_hide_wp_branding', false ),
+<<<<<<< HEAD
 			'canvas_full_bleed_rows' => (bool) get_option( 'onedog_bbca_canvas_full_bleed_rows', false ),
 			'canvas_load_theme_styles' => (bool) get_option( 'onedog_bbca_canvas_load_theme_styles', false ),
+=======
+			'column_sorting' => get_option( 'onedog_bbca_column_sorting', [] ),
+>>>>>>> e5f408e (feat(column-sorting): add column sorting and filtering module)
 		];
 
 		// Export all role capabilities.
@@ -581,6 +599,15 @@ final class OneDog_BB_REST {
 		}
 		if ( isset( $config['canvas_load_theme_styles'] ) ) {
 			update_option( 'onedog_bbca_canvas_load_theme_styles', ! empty( $config['canvas_load_theme_styles'] ) );
+		}
+
+		// Import column sorting settings.
+		if ( isset( $config['column_sorting'] ) && is_array( $config['column_sorting'] ) ) {
+			if ( class_exists( 'OneDog_BBCA_Column_Sorting' ) ) {
+				OneDog_BBCA_Column_Sorting::save_settings( $config['column_sorting'] );
+			} else {
+				update_option( 'onedog_bbca_column_sorting', $config['column_sorting'] );
+			}
 		}
 
 		return rest_ensure_response( [ 'success' => true ] );
@@ -856,6 +883,55 @@ final class OneDog_BB_REST {
 		update_option( 'onedog_bbca_canvas_load_theme_styles', ! empty( $settings['load_theme_styles'] ) );
 
 		return rest_ensure_response( [ 'success' => true ] );
+	}
+
+	/*
+	|--------------------------------------------------------------------------
+	| Column Sorting & Filtering Endpoints
+	|--------------------------------------------------------------------------
+	*/
+
+	/**
+	 * Returns the column sorting settings and available screens.
+	 *
+	 * @since 1.4.0
+	 * @return WP_REST_Response
+	 */
+	public static function get_column_sorting() {
+		if ( ! class_exists( 'OneDog_BBCA_Column_Sorting' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Column Sorting module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$settings  = OneDog_BBCA_Column_Sorting::get_settings();
+		$screens   = OneDog_BBCA_Column_Sorting::get_available_screens();
+
+		return rest_ensure_response( [
+			'settings'          => $settings,
+			'available_screens' => $screens,
+		] );
+	}
+
+	/**
+	 * Saves the column sorting settings.
+	 *
+	 * @since 1.4.0
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function save_column_sorting( $request ) {
+		if ( ! class_exists( 'OneDog_BBCA_Column_Sorting' ) ) {
+			return new WP_Error( 'module_disabled', __( 'Column Sorting module is not enabled.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$settings = $request->get_param( 'settings' );
+
+		if ( ! is_array( $settings ) ) {
+			return new WP_Error( 'invalid_data', __( 'Settings must be an array.', 'bb-custom-admin' ), [ 'status' => 400 ] );
+		}
+
+		$saved = OneDog_BBCA_Column_Sorting::save_settings( $settings );
+
+		return rest_ensure_response( [ 'success' => true, 'settings' => $saved ] );
 	}
 }
 
