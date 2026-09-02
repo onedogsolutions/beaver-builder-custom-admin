@@ -48,22 +48,22 @@ No option keys changed, so there is no data migration: `onedog_bbca_canvas_enabl
 
 **Released to `main`** via `claude/admin-menu-version-access-hhxlc0`. A distributable build is produced with `bin/build-zip.sh`.
 
-**Tested off-site under a WordPress stub harness** (`ReflectionMethod`/`ReflectionFunction` resolution and the gate), not yet on ott-dev:
+**Tested off-site under a WordPress stub harness** (`ReflectionMethod`/`ReflectionFunction` resolution and the gate):
 
 - Notice filtering: plain function, static method and instance method callbacks defined under a fake plugin dir were removed across `admin_notices` and `all_admin_notices`; core-defined callbacks, an internal function (`strlen`, no defining file) and an unresolvable callback were all kept.
 - Gate: 13 cases covering targeted/non-targeted roles, toggle off, empty target roles, each exempt screen, admin bypass, the bypass param held by a non-admin, and confirmation that squashing activates with no Beaver Builder and no layout assigned.
 
-**Live verification still to run on ott-dev**, as a targeted non-admin role:
+**Live verification on ott-dev (v1.5.0 installed over active v1.4.0 via `wp plugin install <zip> --force`), run 2026-09-01 through Novamira + a browser session as an administrator (a targeted role); the non-admin role gate was checked server-side for an editor.** All markers behaved as designed — `<style id="onedog-bbca-squash-notices">`, `<style id="onedog-bbca-squash-popups">` and `<script id="onedog-bbca-squash-popups-js">` present on every non-exempt screen, absent on `plugins.php`, `update-core.php` and with `?bbca_bypass=1`:
 
-- Admin bar renders normally on every screen with squashing on — this is the regression that started this, check it first
-- Admin menu unchanged with squashing on vs. off
-- A known plugin nag is gone, but saving a Settings page still shows "Settings saved."
-- A nag suppressed on the dashboard is also suppressed on `edit.php` and `upload.php`
-- `plugins.php` and `update-core.php` still show their notices
-- The offending overlays stay hidden and the page still scrolls behind them
-- The media modal still opens on `upload.php`; the Beaver Builder editor still loads
-- Toggling squashing off restores everything
-- `?bbca_bypass=1` as an administrator disables squashing
+- Admin bar intact on every screen with squashing on — the regression that started this. All root items present (wp-logo, site-name, updates, command-palette, new-content, plus plugin-added seopress/fluent-form/novamira nodes) and the top-secondary group intact. Admin menu unchanged, squash on vs. off (23 top-level items both times).
+- The WPvivid Plugins Pro update nag is suppressed with squashing on and reappears with it off. The same suppression applies on the dashboard, `edit.php` and `upload.php`.
+- Saving Settings → General still shows the core "Settings saved." notice with squashing on.
+- `plugins.php` and `update-core.php` still show their update notices (Novamira 1.12.1, WPvivid 2.2.50, backup reminder).
+- The inline uploader on `upload.php` opens and closes normally; the Beaver Builder editor loads on `/?fl_builder` and exits cleanly via Done → Discard.
+- The settings app renders all six tabs; the squash card carries the corrected copy ("Leaves the admin bar and the admin menu untouched"), and toggling squash off/on through the UI saves and takes effect immediately.
+- No browser console errors; no PHP errors logged.
+
+Two checklist items remain unverifiable on this install: no known offending overlay was present to exercise `squash_popup_css()` against (the popup blocklist defaults are still untested against real offenders), and the overlays/scroll-lock path went with it. Every other item passed. The site was left with squashing ON (it was OFF before testing) and layout 33 ("White Label Dashboard") assigned. Test screenshots: `dist/test-artifacts-v1.5.0/`.
 
 ### Release engineering for v1.5.0
 
