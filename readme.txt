@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.5.0
+Stable tag: 1.6.0
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,14 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.6.0 =
+* New "Premium / Custom Menus" section in the Menu Restrictor for plugins whose admin menus are not discovered automatically because they guard admin_menu behind is_admin().
+* Built-in mapping for SEOPress: the SEO top-level menu and its submenus (Dashboard, Titles & Metas, XML/HTML Sitemap, Social Networks, Analytics, Instant Indexing, Advanced, Tools) now appear and can be hidden per role.
+* Added onedog_bbca_menu_visibility_extra_items filter so developers can register additional supplemental menu items.
+* Added manual custom menu item form: specify a label, slug, and optional parent slug to hide arbitrary admin pages per role.
+* Supplemental menu restrictions are enforced by the existing remove_menus() and block_direct_access() logic.
+* Premium/custom menu settings are included in configuration export/import.
 
 = 1.5.0 =
 * 3rd-Party Injection Squashing no longer modifies the admin bar. It removed every top-level node outside a small whitelist, which also caught the two container groups WordPress registers (root-default and top-secondary) — so the whitelisted items were orphaned at render time and the toolbar was gutted rather than trimmed. Squashing now only suppresses interruptions in the admin body, which is what it was meant to do.
@@ -170,6 +178,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.6.0 =
+The Menu Restrictor can now hide admin menus from plugins that were not detected automatically, starting with SEOPress. No action is required unless you want to use the new Premium / Custom Menus section.
 
 = 1.5.0 =
 3rd-Party Injection Squashing no longer touches the admin bar, and now applies across wp-admin rather than only the dashboard. It also stops swallowing WordPress's own messages — only notices registered by other plugins are removed. If you had squashing enabled, review it after updating: its scope has changed.

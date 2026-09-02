@@ -2,9 +2,59 @@
 
 ## Release state
 
-**`main` is at v1.5.0** as of the 3rd-Party Injection Squashing rewrite. Previous: v1.4.0 (Column Sorting & Filtering), v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.6.0** as of the Premium Plugin Menu Restrictor support. Previous: v1.5.0 (3rd-Party Injection Squashing rewrite), v1.4.0 (Column Sorting & Filtering), v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.5.0 (3rd-Party Injection Squashing Rewrite)
+## Current Phase: v1.6.0 (Premium Plugin Menu Restrictor)
+
+### v1.6.0 Modifications
+
+**Problem:** The Menu Restrictor discovers admin menus by loading `wp-admin/includes/admin.php` and `wp-admin/menu.php` inside the REST request that powers the settings UI. Plugins that register their admin menus only when `is_admin()` is true do not appear. SEOPress is the reported example — its kernel (`wp-seopress/src/Core/Kernel.php`) only wires backend hooks when `is_admin()` returns true, and `is_admin()` is false in REST context, so the "SEO" menu is missing from the restrictor list.
+
+**Live discovery on ott-dev confirmed it.** After bootstrapping the admin menu in REST context, only six top-level menus were returned: Pods Admin, Novamira, Fluent Forms Pro, Payments, WPCodeBox, and WP fail2ban. SEOPress, Beaver Builder, and other `is_admin()`-guarded menus were absent.
+
+**Solution:** A supplemental menu registry that feeds into `get_available_menus()` and is editable from the React UI.
+
+1. **Built-in plugin mappings.** `OneDog_BBCA_Menu_Visibility::get_extra_menu_items()` detects active SEOPress (`wp-seopress/seopress.php` or `seopress/seopress.php`) and returns the full "SEO" menu tree: top-level `seopress-option`, plus Dashboard, Titles & Metas, XML/HTML Sitemap, Social Networks, Analytics, Instant Indexing, Advanced, and Tools submenus.
+2. **Filter hook.** `onedog_bbca_menu_visibility_extra_items` lets developers or site owners register additional supplemental items without modifying the plugin.
+3. **Manual custom items.** Administrators can add arbitrary top-level or submenu slugs through a new form in the Menu Restrictor UI. These are persisted in `onedog_bbca_menu_visibility_custom_items` and merged into the supplemental list.
+4. **Unified enforcement.** `remove_menus()` and `block_direct_access()` now merge the existing `onedog_bbca_menu_visibility` rules with the new `onedog_bbca_menu_visibility_extra` rules, so supplemental restrictions are enforced identically to dynamic ones.
+5. **Import/export support.** Both `extra_menu_rules` and `custom_menu_items` are included in configuration export/import.
+
+**New option keys:**
+
+| Option | Type | Purpose |
+|--------|------|---------|
+| `onedog_bbca_menu_visibility_extra` | array | Hidden supplemental menu slugs per role. |
+| `onedog_bbca_menu_visibility_custom_items` | array | Manually defined supplemental menu item definitions (slug, label, type). |
+
+**New filter:**
+
+| Filter | Purpose |
+|--------|---------|
+| `onedog_bbca_menu_visibility_extra_items` | Register additional supplemental menu items for the restrictor UI. |
+
+**Files changed:**
+- `includes/modules/class-menu-visibility.php` — added `EXTRA_MENU_OPTION`, `CUSTOM_MENU_ITEMS_OPTION`, `get_extra_menu_items()`, `get_custom_menu_items()`, `save_custom_menu_items()`, `get_extra_menu_rules()`, `save_extra_menu_rules()`, `get_merged_menu_rules()`, `merge_extra_menu_items()`, SEOPress built-in mapping, and filter hook.
+- `classes/class-onedog-bb-rest.php` — `get_menu_visibility()` now returns `extra_menu_rules`, `custom_menu_items`, and `available_extra_items`; `save_menu_visibility()` persists the new fields; export/import include both new option keys.
+- `src/components/MenuRestrictor.jsx` — new state, new "Premium / Custom Menus" panel with checkbox list and custom-item form, save payload includes the new fields.
+- `beaver-builder-custom-admin.php`, `package.json`, `readme.txt` — version `1.6.0`, changelog, upgrade notice.
+- `build/*` — Regenerated.
+- `STATE.md` — This section.
+
+**Build produced:** `bin/build-zip.sh` creates `dist/beaver-builder-custom-admin-1.6.0.zip` (26 files, 83K).
+
+**Live verification on ott-dev (v1.6.0 installed over active v1.5.0 via Novamira + browser session), run 2026-09-02:**
+
+- Server-side checks: `BBCA_VER` reports `1.6.0`; `OneDog_BBCA_Menu_Visibility` exposes `get_extra_menu_items()`, `get_custom_menu_items()`, `save_custom_menu_items()`, and `get_merged_menu_rules()`.
+- REST endpoint `/onedog-bbca/v1/menu-visibility` returns `available_extra_items` containing the SEOPress "SEO" menu (`seopress-option`) with all eight expected submenus; `extra_menu_rules` and `custom_menu_items` keys are present.
+- Saving a restriction via REST POST persisted `onedog_bbca_menu_visibility_extra` correctly.
+- Browser verification as a temporary administrator: Settings → Custom Admin → Menu Restrictor renders the new "Premium / Custom Menus" panel; SEO appears and can be checked for any role.
+- Browser verification as a temporary Editor with SEO hidden: the left admin sidebar does not contain the "SEO" menu; the menu restriction is enforced.
+- Temporary test users, the uploaded install zip, and the test Editor restriction were removed after verification.
+
+---
+
+## Historical Phase: v1.5.0 (3rd-Party Injection Squashing Rewrite)
 
 ### v1.5.0 Modifications
 

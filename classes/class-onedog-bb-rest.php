@@ -246,30 +246,42 @@ final class OneDog_BB_REST {
 	public static function get_menu_visibility() {
 		global $wp_roles;
 
-		$menu_rules    = get_option( 'onedog_bbca_menu_visibility', [] );
-		$toolbar_rules = get_option( 'onedog_bbca_toolbar_visibility', [] );
+		$menu_rules       = get_option( 'onedog_bbca_menu_visibility', [] );
+		$toolbar_rules    = get_option( 'onedog_bbca_toolbar_visibility', [] );
+		$extra_menu_rules = [];
 
 		// Available items for the UI.
-		$available_menus    = [];
-		$available_toolbar  = [];
+		$available_menus      = [];
+		$available_toolbar    = [];
+		$available_extra_items = [];
+
+		$custom_menu_items = [];
 
 		if ( class_exists( 'OneDog_BBCA_Menu_Visibility' ) ) {
-			$available_menus   = OneDog_BBCA_Menu_Visibility::get_available_menus();
-			$available_toolbar = OneDog_BBCA_Menu_Visibility::get_available_toolbar_nodes();
+			$available_menus       = OneDog_BBCA_Menu_Visibility::get_available_menus();
+			$available_toolbar     = OneDog_BBCA_Menu_Visibility::get_available_toolbar_nodes();
+			$available_extra_items = OneDog_BBCA_Menu_Visibility::get_extra_menu_items();
+			$extra_menu_rules      = OneDog_BBCA_Menu_Visibility::get_extra_menu_rules();
+			$custom_menu_items     = OneDog_BBCA_Menu_Visibility::get_custom_menu_items();
 		}
 
 		return rest_ensure_response( [
-			'menu_rules'        => is_array( $menu_rules ) ? $menu_rules : [],
-			'toolbar_rules'     => is_array( $toolbar_rules ) ? $toolbar_rules : [],
-			'available_menus'   => $available_menus,
-			'available_toolbar' => $available_toolbar,
-			'roles'             => $wp_roles->get_names(),
+			'menu_rules'            => is_array( $menu_rules ) ? $menu_rules : [],
+			'toolbar_rules'         => is_array( $toolbar_rules ) ? $toolbar_rules : [],
+			'extra_menu_rules'      => $extra_menu_rules,
+			'custom_menu_items'     => $custom_menu_items,
+			'available_menus'       => $available_menus,
+			'available_toolbar'     => $available_toolbar,
+			'available_extra_items' => $available_extra_items,
+			'roles'                 => $wp_roles->get_names(),
 		] );
 	}
 
 	public static function save_menu_visibility( $request ) {
-		$menu_rules    = $request->get_param( 'menu_rules' );
-		$toolbar_rules = $request->get_param( 'toolbar_rules' );
+		$menu_rules        = $request->get_param( 'menu_rules' );
+		$toolbar_rules     = $request->get_param( 'toolbar_rules' );
+		$extra_menu_rules  = $request->get_param( 'extra_menu_rules' );
+		$custom_menu_items = $request->get_param( 'custom_menu_items' );
 
 		if ( is_array( $menu_rules ) ) {
 			$sanitized_menu = [];
@@ -291,6 +303,14 @@ final class OneDog_BB_REST {
 					: [];
 			}
 			update_option( 'onedog_bbca_toolbar_visibility', $sanitized_toolbar );
+		}
+
+		if ( is_array( $extra_menu_rules ) && class_exists( 'OneDog_BBCA_Menu_Visibility' ) ) {
+			OneDog_BBCA_Menu_Visibility::save_extra_menu_rules( $extra_menu_rules );
+		}
+
+		if ( is_array( $custom_menu_items ) && class_exists( 'OneDog_BBCA_Menu_Visibility' ) ) {
+			OneDog_BBCA_Menu_Visibility::save_custom_menu_items( $custom_menu_items );
 		}
 
 		return rest_ensure_response( [ 'success' => true ] );
@@ -524,6 +544,8 @@ final class OneDog_BB_REST {
 			'roles' => [],
 			'menu_rules' => get_option( 'onedog_bbca_menu_visibility', [] ),
 			'toolbar_rules' => get_option( 'onedog_bbca_toolbar_visibility', [] ),
+			'extra_menu_rules' => get_option( 'onedog_bbca_menu_visibility_extra', [] ),
+			'custom_menu_items' => get_option( 'onedog_bbca_menu_visibility_custom_items', [] ),
 			'modules' => get_option( 'onedog_bbca_modules', [] ),
 			'notice_cleaner' => get_option( 'onedog_bbca_notice_cleaner', [] ),
 			'canvas_layout_id' => absint( get_option( 'onedog_bbca_canvas_layout_id', 0 ) ),
@@ -566,6 +588,24 @@ final class OneDog_BB_REST {
 		// Import toolbar rules.
 		if ( isset( $config['toolbar_rules'] ) && is_array( $config['toolbar_rules'] ) ) {
 			update_option( 'onedog_bbca_toolbar_visibility', $config['toolbar_rules'] );
+		}
+
+		// Import supplemental menu rules.
+		if ( isset( $config['extra_menu_rules'] ) && is_array( $config['extra_menu_rules'] ) ) {
+			if ( class_exists( 'OneDog_BBCA_Menu_Visibility' ) ) {
+				OneDog_BBCA_Menu_Visibility::save_extra_menu_rules( $config['extra_menu_rules'] );
+			} else {
+				update_option( 'onedog_bbca_menu_visibility_extra', $config['extra_menu_rules'] );
+			}
+		}
+
+		// Import custom menu item definitions.
+		if ( isset( $config['custom_menu_items'] ) && is_array( $config['custom_menu_items'] ) ) {
+			if ( class_exists( 'OneDog_BBCA_Menu_Visibility' ) ) {
+				OneDog_BBCA_Menu_Visibility::save_custom_menu_items( $config['custom_menu_items'] );
+			} else {
+				update_option( 'onedog_bbca_menu_visibility_custom_items', $config['custom_menu_items'] );
+			}
 		}
 
 		// Import modules.

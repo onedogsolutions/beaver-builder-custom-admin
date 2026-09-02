@@ -37,6 +37,31 @@ final class OneDog_BBCA_Menu_Visibility {
 	const TOOLBAR_OPTION = 'onedog_bbca_toolbar_visibility';
 
 	/**
+	 * Option key for hidden supplemental menu items per role.
+	 *
+	 * Stores restrictions for menus that are not discovered dynamically because
+	 * their registering plugin guards admin_menu behind is_admin(). Uses the
+	 * same slug format as MENU_OPTION.
+	 *
+	 * Structure: [ 'role' => [ 'menu-slug', 'submenu:parent>slug', ... ] ]
+	 *
+	 * @var string
+	 */
+	const EXTRA_MENU_OPTION = 'onedog_bbca_menu_visibility_extra';
+
+	/**
+	 * Option key for manually defined supplemental menu item definitions.
+	 *
+	 * Stores label/slug metadata for custom menu items added through the UI
+	 * that are not provided by built-in plugin mappings or the filter hook.
+	 *
+	 * Structure: [ [ 'slug' => '...', 'label' => '...', 'type' => 'menu|submenu' ], ... ]
+	 *
+	 * @var string
+	 */
+	const CUSTOM_MENU_ITEMS_OPTION = 'onedog_bbca_menu_visibility_custom_items';
+
+	/**
 	 * Initializes hooks.
 	 *
 	 * @since 0.3.0
@@ -59,13 +84,13 @@ final class OneDog_BBCA_Menu_Visibility {
 	 */
 	public static function remove_menus() {
 		$role  = self::get_current_role();
-		$rules = get_option( self::MENU_OPTION, [] );
+		$rules = self::get_merged_menu_rules( $role );
 
-		if ( ! is_array( $rules ) || ! isset( $rules[ $role ] ) || ! is_array( $rules[ $role ] ) ) {
+		if ( empty( $rules ) ) {
 			return;
 		}
 
-		foreach ( $rules[ $role ] as $item ) {
+		foreach ( $rules as $item ) {
 			$item = sanitize_text_field( $item );
 
 			if ( str_starts_with( $item, 'submenu:' ) ) {
@@ -120,13 +145,11 @@ final class OneDog_BBCA_Menu_Visibility {
 		}
 
 		$role  = self::get_current_role();
-		$rules = get_option( self::MENU_OPTION, [] );
+		$hidden = self::get_merged_menu_rules( $role );
 
-		if ( ! is_array( $rules ) || ! isset( $rules[ $role ] ) || ! is_array( $rules[ $role ] ) ) {
+		if ( empty( $hidden ) ) {
 			return;
 		}
-
-		$hidden = $rules[ $role ];
 
 		// Get current page.
 		$pagenow = $GLOBALS['pagenow'] ?? '';
@@ -201,6 +224,206 @@ final class OneDog_BBCA_Menu_Visibility {
 	}
 
 	/**
+	 * Merges dynamic and supplemental menu restriction rules for a role.
+	 *
+	 * @since 1.6.0
+	 * @param string $role Role slug.
+	 * @return array
+	 */
+	private static function get_merged_menu_rules( $role ) {
+		$dynamic = get_option( self::MENU_OPTION, [] );
+		$extra   = get_option( self::EXTRA_MENU_OPTION, [] );
+
+		$merged = [];
+		foreach ( [ $dynamic, $extra ] as $source ) {
+			if ( is_array( $source ) && isset( $source[ $role ] ) && is_array( $source[ $role ] ) ) {
+				foreach ( $source[ $role ] as $item ) {
+					$item = sanitize_text_field( $item );
+					if ( ! in_array( $item, $merged, true ) ) {
+						$merged[] = $item;
+					}
+				}
+			}
+		}
+
+		return $merged;
+	}
+
+	/**
+	 * Returns supplemental menu items that are not discovered dynamically.
+	 *
+	 * Built-in mappings cover premium plugins that guard admin_menu behind
+	 * is_admin(). The list is filterable via `onedog_bbca_menu_visibility_extra_items`.
+	 *
+	 * @since 1.6.0
+	 * @return array
+	 */
+	public static function get_extra_menu_items() {
+		$extra = [];
+
+		// SEOPress (free or pro) — active check by main plugin file.
+		if ( self::is_plugin_active( 'wp-seopress/seopress.php' ) || self::is_plugin_active( 'seopress/seopress.php' ) ) {
+			$extra[] = [
+				'slug'     => 'seopress-option',
+				'label'    => __( 'SEO', 'bb-custom-admin' ),
+				'type'     => 'menu',
+				'children' => [
+					[
+						'slug'  => 'submenu:seopress-option>seopress-option',
+						'label' => __( 'Dashboard', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+					[
+						'slug'  => 'submenu:seopress-option>seopress-titles',
+						'label' => __( 'Titles & Metas', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+					[
+						'slug'  => 'submenu:seopress-option>seopress-xml-sitemap',
+						'label' => __( 'XML - HTML Sitemap', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+					[
+						'slug'  => 'submenu:seopress-option>seopress-social',
+						'label' => __( 'Social Networks', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+					[
+						'slug'  => 'submenu:seopress-option>seopress-google-analytics',
+						'label' => __( 'Analytics', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+					[
+						'slug'  => 'submenu:seopress-option>seopress-instant-indexing',
+						'label' => __( 'Instant Indexing', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+					[
+						'slug'  => 'submenu:seopress-option>seopress-advanced',
+						'label' => __( 'Advanced', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+					[
+						'slug'  => 'submenu:seopress-option>seopress-import-export',
+						'label' => __( 'Tools', 'bb-custom-admin' ),
+						'type'  => 'submenu',
+					],
+				],
+			];
+		}
+
+		/**
+		 * Filter supplemental menu items available for restriction.
+		 *
+		 * @since 1.6.0
+		 *
+		 * @param array $extra Menu items with the same shape as get_available_menus().
+		 */
+		$extra = apply_filters( 'onedog_bbca_menu_visibility_extra_items', $extra );
+
+		// Append any manually defined custom items.
+		$custom = self::get_custom_menu_items();
+		if ( ! empty( $custom ) && is_array( $custom ) ) {
+			foreach ( $custom as $item ) {
+				if ( ! empty( $item['slug'] ) ) {
+					$extra[] = $item;
+				}
+			}
+		}
+
+		return $extra;
+	}
+
+	/**
+	 * Reads saved manual custom menu item definitions.
+	 *
+	 * @since 1.6.0
+	 * @return array
+	 */
+	public static function get_custom_menu_items() {
+		$items = get_option( self::CUSTOM_MENU_ITEMS_OPTION, [] );
+		return is_array( $items ) ? $items : [];
+	}
+
+	/**
+	 * Saves manual custom menu item definitions.
+	 *
+	 * @since 1.6.0
+	 * @param array $items List of custom item definitions.
+	 * @return void
+	 */
+	public static function save_custom_menu_items( $items ) {
+		if ( ! is_array( $items ) ) {
+			$items = [];
+		}
+
+		$sanitized = [];
+		foreach ( $items as $item ) {
+			if ( empty( $item['slug'] ) || empty( $item['label'] ) ) {
+				continue;
+			}
+			$sanitized[] = [
+				'slug'  => sanitize_text_field( $item['slug'] ),
+				'label' => sanitize_text_field( $item['label'] ),
+				'type'  => sanitize_text_field( $item['type'] ?? 'menu' ),
+			];
+		}
+
+		update_option( self::CUSTOM_MENU_ITEMS_OPTION, $sanitized );
+	}
+
+	/**
+	 * Reads saved supplemental menu restriction rules.
+	 *
+	 * @since 1.6.0
+	 * @return array
+	 */
+	public static function get_extra_menu_rules() {
+		$rules = get_option( self::EXTRA_MENU_OPTION, [] );
+		return is_array( $rules ) ? $rules : [];
+	}
+
+	/**
+	 * Saves supplemental menu restriction rules.
+	 *
+	 * @since 1.6.0
+	 * @param array $rules Rules array keyed by role slug.
+	 * @return void
+	 */
+	public static function save_extra_menu_rules( $rules ) {
+		if ( ! is_array( $rules ) ) {
+			$rules = [];
+		}
+
+		$sanitized = [];
+		foreach ( $rules as $role => $items ) {
+			$role_key = sanitize_text_field( $role );
+			$sanitized[ $role_key ] = is_array( $items )
+				? array_map( 'sanitize_text_field', $items )
+				: [];
+		}
+
+		update_option( self::EXTRA_MENU_OPTION, $sanitized );
+	}
+
+	/**
+	 * Checks whether a plugin is active.
+	 *
+	 * Wrapper that works before `is_plugin_active()` is available.
+	 *
+	 * @since 1.6.0
+	 * @param string $plugin Plugin basename.
+	 * @return bool
+	 */
+	private static function is_plugin_active( $plugin ) {
+		if ( ! function_exists( 'is_plugin_active' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		return is_plugin_active( $plugin );
+	}
+
+	/**
 	 * Returns the list of registered top-level admin menu items.
 	 *
 	 * Used by the REST API to populate the settings UI.
@@ -252,6 +475,55 @@ final class OneDog_BBCA_Menu_Visibility {
 						'type'  => 'submenu',
 					];
 				}
+			}
+
+			$items[] = $entry;
+		}
+
+		$items = self::merge_extra_menu_items( $items );
+
+		return $items;
+	}
+
+	/**
+	 * Merges supplemental menu items into dynamically discovered menus.
+	 *
+	 * Supplemental items cover plugins (e.g. SEOPress) that do not register
+	 * their admin menus in REST context. Dynamic discovery wins on slug
+	 * collision so live labels are preserved.
+	 *
+	 * @since 1.6.0
+	 * @param array $items Dynamically discovered menu items.
+	 * @return array
+	 */
+	private static function merge_extra_menu_items( $items ) {
+		$extra = self::get_extra_menu_items();
+		if ( empty( $extra ) ) {
+			return $items;
+		}
+
+		$slugs = array_column( $items, 'slug' );
+
+		foreach ( $extra as $entry ) {
+			if ( empty( $entry['slug'] ) ) {
+				continue;
+			}
+
+			$existing = array_search( $entry['slug'], $slugs, true );
+			if ( false !== $existing ) {
+				// Merge children from the supplemental entry into the live entry
+				// without duplicating slugs.
+				if ( ! empty( $entry['children'] ) && is_array( $entry['children'] ) ) {
+					$child_slugs = array_column( $items[ $existing ]['children'], 'slug' );
+					foreach ( $entry['children'] as $child ) {
+						if ( empty( $child['slug'] ) || in_array( $child['slug'], $child_slugs, true ) ) {
+							continue;
+						}
+						$items[ $existing ]['children'][] = $child;
+						$child_slugs[] = $child['slug'];
+					}
+				}
+				continue;
 			}
 
 			$items[] = $entry;
