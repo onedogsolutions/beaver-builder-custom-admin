@@ -65,6 +65,22 @@ No option keys changed, so there is no data migration: `onedog_bbca_canvas_enabl
 - Toggling squashing off restores everything
 - `?bbca_bypass=1` as an administrator disables squashing
 
+### Release engineering for v1.5.0
+
+Three things were repaired on the way to this release; none of them changed a feature.
+
+**The v1.4.0 merge had been committed with unresolved conflict markers** in nine tracked files — `beaver-builder-custom-admin.php`, `classes/class-onedog-bb-rest.php`, `build/index.asset.php`, `build/index.js`, `build/index.css`, `build/index-rtl.css`, `package.json`, `readme.txt` and `STATE.md`. The three PHP files would not parse, so the plugin fataled on load, and `build/index.js` was two whole copies of the bundle concatenated while the two stylesheets were three copies each (76 KB against a real 25 KB). Fixed in `8bb0f3f`. The one resolution that was not mechanical: the export array in `class-onedog-bb-rest.php` needed *both* sides — `canvas_full_bleed_rows`, `canvas_load_theme_styles` **and** `column_sorting` — since taking either side alone would have silently dropped keys from export/import. The missing 1.4.0 upgrade notice was added at the same time.
+
+**`npm run lint:js` had never run.** `@wordpress/eslint-plugin` declares `typescript` as an optional peer with range `>=5`; npm auto-installs optional peers and resolved it to 7.0.2. TypeScript 7 is the Go rewrite and `require('typescript')` no longer exposes `TypeFlags`, so `ts-api-utils` threw at module load reading `ts.TypeFlags.Intrinsic` and took `@typescript-eslint` — and the whole lint run — down with it. Fixed in `bc2bf8b` by pinning `typescript` to `^5.9.3` in `devDependencies`; nothing here is TypeScript, the dependency exists only so `@typescript-eslint` can load. The lockfile also shed the `@typescript/typescript-*` native binaries TS 7 pulled in, and picked up the plugin version it had stale at `1.0.0`.
+
+**Lint now runs and reports 254 pre-existing findings**, none introduced by this merge — the count is identical before and after it. 212 are `prettier/prettier` formatting, then 15 `jsx-a11y/label-has-associated-control`, 8 `jsdoc/empty-tags`, 6 other `jsx-a11y`, 2 `jsdoc/require-param`. 230 are `--fix`-able but that is a whole-codebase reformat and was deliberately left out of a merge commit. The 24 that are not auto-fixable are real: modal overlays in `RoleEditor.jsx` carry click handlers with no keyboard path, and several form labels are not associated with a control. Worth its own pass.
+
+**Verification run on the merge result:** no conflict markers anywhere in the tree; `php -l` clean on every PHP file; every `add_action( ..., [ __CLASS__, 'x' ] )` callback in the merged canvas class resolves to a definition; `npm run build` compiles; column sorting still wired through the module loader, the REST routes, import/export and the App tab.
+
+**Branch state: nothing is left unmerged.** `claude/admin-menu-version-access-hhxlc0` was the last branch carrying work `main` did not have. The other three `claude/*` branches on the remote are fully contained in `main` and can be deleted. No open pull requests.
+
+**On the version number.** This branch bumped to `1.4.0`, written before Column Sorting existed. Column Sorting reached `main` first and took that number, so the squashing rewrite ships as `1.5.0`. Nothing is tagged in this repository and releases are cut by hand with `bin/build-zip.sh`, so the risk being avoided is two different zips both stamped 1.4.0 — WordPress will not offer an update between builds sharing a version. If no 1.4.0 zip was ever distributed, collapsing both feature sets into a single 1.4.0 is equally correct and only costs a renumber.
+
 ---
 
 ## Historical Phase: v1.4.0 (Column Sorting & Filtering)
