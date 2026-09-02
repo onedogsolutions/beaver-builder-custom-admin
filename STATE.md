@@ -2,10 +2,75 @@
 
 ## Release state
 
-<<<<<<< HEAD
-**`main` is at v1.3.6** as of the settings-page return to the Settings menu. Previous: v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.4.0** as of the Column Sorting & Filtering module. Previous: v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.3.6 (Settings Page Returned to the Settings Menu)
+## Current Phase: v1.4.0 (Column Sorting & Filtering)
+
+### v1.4.0 Modifications
+
+**New module: Column Sorting & Filtering (`column-sorting`).** Makes all WordPress admin list table columns sortable and adds a smart filtering sidebar. Inspired by Admin Columns Pro sorting and filtering features.
+
+**Sortable columns on all list screens.**
+
+Hooks into `manage_*_sortable_columns` filters to register all detected columns as sortable on post, page, CPT, user, comment, and media list tables. Sort handlers:
+- `pre_get_posts` for post-type screens (meta, taxonomy, post field sorting)
+- `pre_user_query` for user screens (user field, user meta sorting)
+- `comments_clauses` for comment screens (comment field, comment meta sorting)
+
+**Column type detection.** Auto-detects the data type of each column to choose the correct sort strategy: post meta (meta_value/meta_value_num), taxonomy (JOIN on terms tables), user meta, post fields, and native WP_Query orderby values. Unknown columns fall back to meta_value sorting.
+
+**Smart filtering sidebar.** Renders filter dropdowns above list tables via `restrict_manage_posts`, `restrict_manage_users`, and `manage_comments_nav`. Filter values are applied to the underlying queries. Taxonomy columns use WordPress's native `wp_dropdown_categories`. Active filters are highlighted and a "Clear Filters" button appears when any filter is active.
+
+**Addon integrations.** Lightweight adapters in `class-column-sorting-integrations.php` map column types for:
+- **WooCommerce**: product price, SKU, stock status, categories, tags; order total, status, date; coupon amount, usage limit, expiry. Product attributes registered as taxonomy columns are also detected.
+- **Gravity Forms**: entry fields (ID, date, IP, status); form field columns dynamically discovered from `GFFormsModel::get_forms()`.
+- **Pods**: custom field columns dynamically discovered from `pods_api()->load_pods()`.
+
+Each adapter only activates when its respective plugin class is detected.
+
+**Per-screen settings UI.** New `ColumnSorting` tab in Settings → Custom Admin with:
+- Screen selector dropdown (all registered post types, users, comments, GF forms)
+- Sorting enable/disable toggle per screen
+- Filtering enable/disable toggle per screen
+- Optional default sort column + direction (ASC/DESC) per screen
+- Filter column selection (checkboxes to include/exclude specific columns from dropdowns)
+
+**REST API — New Endpoints.**
+
+| Route | Method | Purpose |
+|-------|--------|--------|
+| `/onedog-bbca/v1/column-sorting` | GET | Retrieve settings + available screens with columns |
+| `/onedog-bbca/v1/column-sorting` | POST | Save per-screen sorting/filtering settings |
+
+**Import/Export.** Column sorting settings are included in the full configuration export and restored on import.
+
+**New option key:**
+
+| Option | Type | Purpose |
+|--------|------|--------|
+| `onedog_bbca_column_sorting` | array | Per-screen sorting/filtering configuration |
+
+**Filter hook:** `onedog_bbca_column_type_map` — allows extending the column type map for future plugin integrations.
+
+**Files added:**
+- `includes/modules/class-column-sorting.php` — Core module (discovery, sortable registration, post/user/comment sorting handlers, type detection)
+- `includes/modules/class-column-sorting-filters.php` — Filter sidebar rendering and query application
+- `includes/modules/class-column-sorting-integrations.php` — WooCommerce, Gravity Forms, and Pods adapters
+- `assets/css/column-sorting.css` — Filter dropdown styles
+- `src/components/ColumnSorting.jsx` — React settings component
+
+**Files changed:**
+- `includes/modules/class-module-loader.php` — Registered `column-sorting` module + metadata
+- `classes/class-onedog-bb-rest.php` — Added `/column-sorting` routes, `column_sorting` in import/export
+- `src/components/App.jsx` — Added Column Sorting tab
+- `beaver-builder-custom-admin.php` — Version bumped to 1.4.0, updated description
+- `package.json` — Version bumped to 1.4.0
+- `readme.txt` — Stable tag 1.4.0, changelog entries
+- `STATE.md` — This section
+
+---
+
+## Historical Phase: v1.3.6 (Settings Page Returned to the Settings Menu)
 
 ### v1.3.6 Modifications
 
@@ -166,54 +231,10 @@ So the left `-20px` pulled the canvas out of the content column and onto the adm
 - `readme.txt` — Stable tag, changelog, upgrade notice.
 - `build/*` — Regenerated.
 - `STATE.md` — This section.
-=======
-**`main` is at v1.4.0** as of the Column Sorting & Filtering module. Previous: v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
-
-## Current Phase: v1.4.0 (Column Sorting & Filtering)
-
-### v1.4.0 Modifications
-
-**New module: Column Sorting & Filtering (`column-sorting`).** Makes all WordPress admin list table columns sortable and adds a smart filtering sidebar. Inspired by Admin Columns Pro sorting and filtering features.
-
-**Sortable columns on all list screens.**
-
-Hooks into `manage_*_sortable_columns` filters to register all detected columns as sortable on post, page, CPT, user, comment, and media list tables. Sort handlers:
-- `pre_get_posts` for post-type screens (meta, taxonomy, post field sorting)
-- `pre_user_query` for user screens (user field, user meta sorting)
-- `comments_clauses` for comment screens (comment field, comment meta sorting)
-
-**Column type detection.** Auto-detects the data type of each column to choose the correct sort strategy: post meta (meta_value/meta_value_num), taxonomy (JOIN on terms tables), user meta, post fields, and native WP_Query orderby values. Unknown columns fall back to meta_value sorting.
-
-**Smart filtering sidebar.** Renders filter dropdowns above list tables via `restrict_manage_posts`, `restrict_manage_users`, and `manage_comments_nav`. Filter values are applied to the underlying queries. Taxonomy columns use WordPress's native `wp_dropdown_categories`. Active filters are highlighted and a "Clear Filters" button appears when any filter is active.
-
-**Addon integrations.** Lightweight adapters in `class-column-sorting-integrations.php` map column types for:
-- **WooCommerce**: product price, SKU, stock status, categories, tags; order total, status, date; coupon amount, usage limit, expiry. Product attributes registered as taxonomy columns are also detected.
-- **Gravity Forms**: entry fields (ID, date, IP, status); form field columns dynamically discovered from `GFFormsModel::get_forms()`.
-- **Pods**: custom field columns dynamically discovered from `pods_api()->load_pods()`.
-
-Each adapter only activates when its respective plugin class is detected.
-
-**Per-screen settings UI.** New `ColumnSorting` tab in Settings → Custom Admin with:
-- Screen selector dropdown (all registered post types, users, comments, GF forms)
-- Sorting enable/disable toggle per screen
-- Filtering enable/disable toggle per screen
-- Optional default sort column + direction (ASC/DESC) per screen
-- Filter column selection (checkboxes to include/exclude specific columns from dropdowns)
-
-**REST API — New Endpoints.**
-
-| Route | Method | Purpose |
-|-------|--------|--------|
-| `/onedog-bbca/v1/column-sorting` | GET | Retrieve settings + available screens with columns |
-| `/onedog-bbca/v1/column-sorting` | POST | Save per-screen sorting/filtering settings |
-
-**Import/Export.** Column sorting settings are included in the full configuration export and restored on import.
->>>>>>> e5f408e (feat(column-sorting): add column sorting and filtering module)
 
 **New option key:**
 
 | Option | Type | Purpose |
-<<<<<<< HEAD
 |--------|------|---------|
 | `onedog_bbca_canvas_full_bleed_rows` | bool | Override Beaver Builder's fixed row width inside the canvas |
 
@@ -232,28 +253,6 @@ Each adapter only activates when its respective plugin class is detected.
 Purge LiteSpeed Cache once after deploying — mtime versioning fixes future edits, but the already-optimized combined CSS has to be dropped by hand.
 
 **Also check the settings UI**, since the Full-Bleed Rows toggle is new: Custom Admin → Dashboard Canvas (a top-level sidebar item since v1.3.4; it was Settings → Custom Admin when this was written) should show a "Row Width" card, and toggling it should persist across a reload and survive an export/import round trip.
-=======
-|--------|------|--------|
-| `onedog_bbca_column_sorting` | array | Per-screen sorting/filtering configuration |
-
-**Filter hook:** `onedog_bbca_column_type_map` — allows extending the column type map for future plugin integrations.
-
-**Files added:**
-- `includes/modules/class-column-sorting.php` — Core module (discovery, sortable registration, post/user/comment sorting handlers, type detection)
-- `includes/modules/class-column-sorting-filters.php` — Filter sidebar rendering and query application
-- `includes/modules/class-column-sorting-integrations.php` — WooCommerce, Gravity Forms, and Pods adapters
-- `assets/css/column-sorting.css` — Filter dropdown styles
-- `src/components/ColumnSorting.jsx` — React settings component
-
-**Files changed:**
-- `includes/modules/class-module-loader.php` — Registered `column-sorting` module + metadata
-- `classes/class-onedog-bb-rest.php` — Added `/column-sorting` routes, `column_sorting` in import/export
-- `src/components/App.jsx` — Added Column Sorting tab
-- `beaver-builder-custom-admin.php` — Version bumped to 1.4.0, updated description
-- `package.json` — Version bumped to 1.4.0
-- `readme.txt` — Stable tag 1.4.0, changelog entries
-- `STATE.md` — This section
->>>>>>> e5f408e (feat(column-sorting): add column sorting and filtering module)
 
 ---
 

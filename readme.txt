@@ -4,11 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-<<<<<<< HEAD
-Stable tag: 1.3.6
-=======
 Stable tag: 1.4.0
->>>>>>> e5f408e (feat(column-sorting): add column sorting and filtering module)
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -70,7 +66,18 @@ All data remains local to your WordPress installation.
 
 == Changelog ==
 
-<<<<<<< HEAD
+= 1.4.0 =
+* New module: Column Sorting & Filtering — make all WordPress list table columns sortable and add smart filtering dropdowns.
+* Post, page, CPT, user, comment, and media list tables now support clickable column header sorting.
+* Smart filter sidebar with dropdown selectors for narrowing results by column values.
+* Automatic column type detection: post meta, taxonomy, user meta, and post fields.
+* WooCommerce integration: sortable product price, SKU, stock status; sortable order total, status.
+* Gravity Forms integration: sortable entry fields and form field columns.
+* Pods integration: sortable custom field columns.
+* Per-screen settings UI in Settings > Custom Admin > Column Sorting tab.
+* Column sorting settings included in configuration export/import.
+* New REST endpoints: GET/POST /onedog-bbca/v1/column-sorting.
+
 = 1.3.6 =
 * The settings page has moved back to Settings → Custom Admin. It was a top-level "Custom Admin" sidebar item in 1.3.4 and 1.3.5.
 * It is now registered earlier than most plugins' Settings pages, so it appears near the top of the Settings submenu rather than at the end — that end position, in a flyout taller than the screen, is what made it unreachable before 1.3.4.
@@ -99,19 +106,6 @@ All data remains local to your WordPress installation.
 * Restored the 65px bottom padding that WordPress reserves for the absolutely positioned admin footer.
 * The canvas minimum height now reads the admin bar height from core's --wp-admin--admin-bar--height custom property (46px on small screens) instead of hardcoding 32px.
 * Removed the unused assets/css/admin.css left over from the pre-Tailwind settings UI.
-=======
-= 1.4.0 =
-* New module: Column Sorting & Filtering — make all WordPress list table columns sortable and add smart filtering dropdowns.
-* Post, page, CPT, user, comment, and media list tables now support clickable column header sorting.
-* Smart filter sidebar with dropdown selectors for narrowing results by column values.
-* Automatic column type detection: post meta, taxonomy, user meta, and post fields.
-* WooCommerce integration: sortable product price, SKU, stock status; sortable order total, status.
-* Gravity Forms integration: sortable entry fields and form field columns.
-* Pods integration: sortable custom field columns.
-* Per-screen settings UI in Settings > Custom Admin > Column Sorting tab.
-* Column sorting settings included in configuration export/import.
-* New REST endpoints: GET/POST /onedog-bbca/v1/column-sorting.
->>>>>>> e5f408e (feat(column-sorting): add column sorting and filtering module)
 
 = 1.3.2 =
 * Fixed Dashboard Canvas layout regression after Welcome Screen removal.
@@ -167,6 +161,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+Adds the Column Sorting & Filtering module: sortable columns and filter dropdowns on post, page, CPT, user, comment, and media list tables, with WooCommerce, Gravity Forms, and Pods integrations. Configure it under Settings → Custom Admin → Column Sorting.
 
 = 1.3.6 =
 The settings page returns to Settings → Custom Admin, registered near the top of the Settings submenu. Bookmarks to the 1.3.4-1.3.5 top-level URL redirect.
