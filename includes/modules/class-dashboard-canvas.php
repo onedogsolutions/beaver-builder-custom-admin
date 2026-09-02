@@ -3,8 +3,13 @@
  * Module: Dashboard Canvas — Full-Bleed BB Layout Replacement.
  *
  * Replaces the entire WordPress dashboard with a full-bleed Beaver Builder
- * layout. Simultaneously squashes third-party admin notices, toolbar
- * clutter, and dashboard widgets for targeted user roles.
+ * layout, and wipes the dashboard widgets it replaces, for targeted roles.
+ *
+ * Also hosts 3rd-Party Injection Squashing, which suppresses the notices and
+ * popup overlays other plugins inject into the admin body. Squashing shares
+ * this module's target-roles list but is otherwise independent: it runs on
+ * every admin screen, needs no Beaver Builder layout, and never touches the
+ * admin bar or the admin menu.
  *
  * @since 1.3.0
  * @package OneDog\BBCustomAdmin
@@ -80,13 +85,6 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	const BODY_CLASS = 'bbca-canvas-active';
 
 	/**
-	 * Output-buffer nesting level when notice suppression starts.
-	 *
-	 * @var int|false
-	 */
-	private static $ob_level = false;
-
-	/**
 	 * `Class::method` identifiers already replayed this request.
 	 *
 	 * The theme pass walks the same hook a second time, so without this a
@@ -106,6 +104,11 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	 */
 	public static function init() {
 		add_action( 'current_screen', [ __CLASS__, 'setup_dashboard' ] );
+
+		// Squashing is not canvas behaviour and does not require Beaver
+		// Builder or an assigned layout, so it gets its own entry point on
+		// every admin screen rather than riding along with setup_dashboard().
+		add_action( 'current_screen', [ __CLASS__, 'maybe_setup_squash' ], 11 );
 
 		// Diagnostics. Registered on both footers so the dashboard and a
 		// front-end render of the same layout can be compared directly.
@@ -146,22 +149,20 @@ final class OneDog_BBCA_Dashboard_Canvas {
 		add_action( 'wp_dashboard_setup', [ __CLASS__, 'clear_widgets' ], 9999 );
 
 		// 3. Inject custom Beaver Builder layout container inside #wpbody-content.
-		// Using all_admin_notices at a late priority places the canvas after the
-		// squash output buffer ends, ensuring it is not captured as a notice.
+		// A late priority on all_admin_notices places the canvas after every
+		// other notice callback, so it renders last inside #wpbody-content.
 		add_action( 'all_admin_notices', [ __CLASS__, 'render_canvas' ], 10000 );
 
 		// 4. Enqueue canvas-specific CSS.
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 
-		// 5. Squash 3rd-party injections (when enabled).
-		if ( self::should_squash() ) {
-			self::setup_squash();
-		}
-
-		// 6. Hide WordPress branding (when enabled).
+		// 5. Hide WordPress branding (when enabled).
 		if ( get_option( self::BRANDING_OPTION, false ) ) {
 			self::setup_branding_removal();
 		}
+
+		// Squashing is registered separately, in maybe_setup_squash().
+		
 	}
 
 	/**
@@ -693,99 +694,278 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	*/
 
 	/**
-	 * Registers squash hooks for notice suppression, toolbar cleanup,
-	 * and admin menu decluttering.
+	 * Registers squash hooks when squashing applies to this request.
 	 *
-	 * @since 1.3.0
+	 * Runs on every admin screen. Squashing suppresses interruptions other
+	 * plugins inject into the admin body; it deliberately does not touch the
+	 * admin bar or the admin menu.
+	 *
+	 * @since 1.4.0
+	 * @param WP_Screen $screen The current admin screen.
 	 * @return void
 	 */
-	private static function setup_squash() {
-		// Output-buffer notice suppression.
-		add_action( 'admin_notices', [ __CLASS__, 'start_notice_buffer' ], 1 );
-		add_action( 'all_admin_notices', [ __CLASS__, 'end_notice_buffer' ], 9999 );
-
-		// Whitelist-based toolbar sanitization.
-		add_action( 'wp_before_admin_bar_render', [ __CLASS__, 'squash_toolbar' ], 9999 );
-
-		// CSS safety net for notices that bypass hooks.
-		add_action( 'admin_head', [ __CLASS__, 'squash_notice_css' ] );
-	}
-
-	/**
-	 * Starts output buffering to capture and discard admin notices.
-	 *
-	 * @since 1.3.0
-	 * @return void
-	 */
-	public static function start_notice_buffer() {
-		self::$ob_level = ob_get_level();
-		ob_start();
-	}
-
-	/**
-	 * Ends output buffering, discarding any captured notice output.
-	 *
-	 * Includes a nesting-level safety check in case another plugin
-	 * interfered with the buffer stack between the two hooks.
-	 *
-	 * @since 1.3.0
-	 * @return void
-	 */
-	public static function end_notice_buffer() {
-		if ( false !== self::$ob_level && ob_get_level() > self::$ob_level ) {
-			ob_end_clean();
+	public static function maybe_setup_squash( $screen ) {
+		if ( ! self::should_squash( $screen ) ) {
+			return;
 		}
-		self::$ob_level = false;
+
+		// Drop notice callbacks registered by other plugins. Core callbacks
+		// are left alone so WordPress's own messages still get through.
+		add_action( 'in_admin_header', [ __CLASS__, 'remove_third_party_notices' ] );
+
+		// CSS net for promotional markup that bypasses the notice hooks.
+		add_action( 'admin_head', [ __CLASS__, 'squash_notice_css' ] );
+
+		// Hide and remove popup/overlay interruptions.
+		add_action( 'admin_head', [ __CLASS__, 'squash_popup_css' ] );
+		add_action( 'admin_footer', [ __CLASS__, 'squash_popup_script' ] );
 	}
 
 	/**
-	 * Outputs CSS as a safety net to hide any notices that bypass hooks.
+	 * Returns the admin notice hooks squashing filters.
+	 *
+	 * @since 1.4.0
+	 * @return string[]
+	 */
+	private static function notice_hooks() {
+		return [
+			'admin_notices',
+			'all_admin_notices',
+			'user_admin_notices',
+			'network_admin_notices',
+		];
+	}
+
+	/**
+	 * Removes admin notice callbacks that belong to other plugins.
+	 *
+	 * Each registered callback is resolved to the file that defines it. A
+	 * callback defined under the plugins or mu-plugins directory is a
+	 * third-party injection and is removed; one defined in wp-admin or
+	 * wp-includes is WordPress itself and is kept, so "Settings saved",
+	 * activation results and update failures still reach the user. This is
+	 * the distinction the pre-1.4.0 output buffer could not make - it
+	 * discarded everything printed between two hooks, core messages included.
+	 *
+	 * @since 1.4.0
+	 * @return void
+	 */
+	public static function remove_third_party_notices() {
+		global $wp_filter;
+
+		foreach ( self::notice_hooks() as $hook ) {
+			if ( empty( $wp_filter[ $hook ] ) || ! ( $wp_filter[ $hook ] instanceof WP_Hook ) ) {
+				continue;
+			}
+
+			// Snapshot: remove_action() mutates the live callbacks array.
+			$registered = $wp_filter[ $hook ]->callbacks;
+
+			foreach ( $registered as $priority => $callbacks ) {
+				foreach ( $callbacks as $callback ) {
+					if ( self::is_third_party_callback( $callback['function'] ) ) {
+						remove_action( $hook, $callback['function'], $priority );
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Determines whether a callback is defined by a third-party plugin.
+	 *
+	 * Anything that cannot be resolved is treated as not third-party, so an
+	 * unrecognised callback is left registered rather than silently dropped.
+	 *
+	 * @since 1.4.0
+	 * @param callable $callback The registered callback.
+	 * @return bool
+	 */
+	private static function is_third_party_callback( $callback ) {
+		try {
+			if ( $callback instanceof Closure ) {
+				$ref = new ReflectionFunction( $callback );
+			} elseif ( is_array( $callback ) && 2 === count( $callback ) ) {
+				$ref = new ReflectionMethod( $callback[0], $callback[1] );
+			} elseif ( is_string( $callback ) && false !== strpos( $callback, '::' ) ) {
+				$ref = new ReflectionMethod( $callback );
+			} elseif ( is_string( $callback ) && function_exists( $callback ) ) {
+				$ref = new ReflectionFunction( $callback );
+			} elseif ( is_object( $callback ) && method_exists( $callback, '__invoke' ) ) {
+				$ref = new ReflectionMethod( $callback, '__invoke' );
+			} else {
+				return false;
+			}
+
+			$file = $ref->getFileName();
+		} catch ( ReflectionException $e ) {
+			return false;
+		}
+
+		// Internal functions have no defining file.
+		if ( ! $file ) {
+			return false;
+		}
+
+		$file = wp_normalize_path( $file );
+
+		// Never remove this plugin's own notices.
+		if ( 0 === strpos( $file, wp_normalize_path( BBCA_DIR ) ) ) {
+			return false;
+		}
+
+		$dirs = [ WP_PLUGIN_DIR ];
+
+		if ( defined( 'WPMU_PLUGIN_DIR' ) ) {
+			$dirs[] = WPMU_PLUGIN_DIR;
+		}
+
+		foreach ( $dirs as $dir ) {
+			if ( 0 === strpos( $file, trailingslashit( wp_normalize_path( $dir ) ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Outputs CSS hiding promotional notice markup that bypasses the hooks.
+	 *
+	 * Scoped to promotional wording rather than the blanket
+	 * `.notice, .error, .updated` this used before 1.4.0, which hid every
+	 * message on the screen including WordPress's own.
 	 *
 	 * @since 1.3.0
 	 * @return void
 	 */
 	public static function squash_notice_css() {
+		$selectors = [
+			'.notice[class*="promo"]',
+			'.notice[class*="upsell"]',
+			'.notice[class*="upgrade"]',
+			'.notice[class*="review"]',
+			'.notice[class*="rating"]',
+			'.notice[class*="deal"]',
+			'.notice[class*="sale"]',
+			'.update-nag',
+		];
+
 		echo '<style id="onedog-bbca-squash-notices">'
-			. 'body.bbca-canvas-active .notice, body.bbca-canvas-active .update-nag, '
-			. 'body.bbca-canvas-active .error, body.bbca-canvas-active .updated { '
-			. 'display: none !important; }</style>';
+			. esc_html( implode( ',', $selectors ) )
+			. '{display:none !important;}</style>';
 	}
 
 	/**
-	 * Removes all top-level admin bar nodes except a safe whitelist.
+	 * Returns the popup/overlay selectors squashing hides.
 	 *
-	 * Preserves child nodes of allowed parents (e.g., sub-items under
-	 * site-name or my-account).
+	 * There is no structural signal separating a plugin's upsell modal from
+	 * a legitimate one, so this is a blocklist, not a general rule. The
+	 * defaults match on promotional wording in class and id attributes
+	 * rather than naming individual plugins, and deliberately exclude core
+	 * and Beaver Builder UI (.media-modal, #TB_window, .fl-builder-*).
 	 *
-	 * @since 1.3.0
-	 * @return void
+	 * Filter `onedog_bbca_squash_selectors` to add exact selectors for
+	 * offenders on a given site without needing a plugin release.
+	 *
+	 * @since 1.4.0
+	 * @return string[]
 	 */
-	public static function squash_toolbar() {
-		global $wp_admin_bar;
-
-		if ( ! is_object( $wp_admin_bar ) ) {
-			return;
-		}
-
-		$allowed = [
-			'wp-logo',
-			'site-name',
-			'my-account',
-			'logout',
-			'fl-builder-frontend',
+	public static function popup_selectors() {
+		$selectors = [
+			'[class*="upsell-modal"]',
+			'[class*="promo-modal"]',
+			'[class*="review-modal"]',
+			'[class*="rating-modal"]',
+			'[class*="feedback-modal"]',
+			'[class*="review-notice"]',
+			'[class*="promo-popup"]',
+			'[id*="review-notice"]',
+			'[id*="_review_notice"]',
+			'[id*="upsell-popup"]',
 		];
 
-		$nodes = $wp_admin_bar->get_nodes();
+		return array_filter( array_unique( (array) apply_filters( 'onedog_bbca_squash_selectors', $selectors ) ) );
+	}
 
-		if ( empty( $nodes ) ) {
+	/**
+	 * Outputs CSS hiding popup overlays, so they never flash before the
+	 * script below removes them.
+	 *
+	 * @since 1.4.0
+	 * @return void
+	 */
+	public static function squash_popup_css() {
+		$selectors = self::popup_selectors();
+
+		if ( empty( $selectors ) ) {
 			return;
 		}
 
-		foreach ( $nodes as $node_id => $node ) {
-			if ( ! in_array( $node_id, $allowed, true ) && empty( $node->parent ) ) {
-				$wp_admin_bar->remove_node( $node_id );
-			}
+		echo '<style id="onedog-bbca-squash-popups">'
+			. esc_html( implode( ',', $selectors ) )
+			. '{display:none !important;}</style>';
+	}
+
+	/**
+	 * Removes matched popups from the DOM and releases any scroll lock.
+	 *
+	 * Hiding an overlay with CSS is not enough: modals commonly lock page
+	 * scrolling via a class on <body>, which would strand the page
+	 * unscrollable behind an element nobody can see. The scroll lock is only
+	 * released when something actually matched, so a legitimate modal that
+	 * this does not hide keeps its lock.
+	 *
+	 * The observer catches overlays injected after load and stops after ten
+	 * seconds rather than watching the document for the life of the page.
+	 *
+	 * @since 1.4.0
+	 * @return void
+	 */
+	public static function squash_popup_script() {
+		$selectors = self::popup_selectors();
+
+		if ( empty( $selectors ) ) {
+			return;
 		}
+
+		?>
+		<script id="onedog-bbca-squash-popups-js">
+		( function() {
+			var selectors = <?php echo wp_json_encode( array_values( $selectors ) ); ?>;
+
+			function sweep() {
+				var hit = false;
+
+				selectors.forEach( function( selector ) {
+					try {
+						document.querySelectorAll( selector ).forEach( function( el ) {
+							el.parentNode.removeChild( el );
+							hit = true;
+						} );
+					} catch ( e ) {}
+				} );
+
+				if ( hit && document.body ) {
+					[ 'modal-open', 'no-scroll', 'overflow-hidden' ].forEach( function( c ) {
+						document.body.classList.remove( c );
+					} );
+					document.body.style.overflow = '';
+				}
+			}
+
+			sweep();
+
+			if ( 'undefined' !== typeof MutationObserver && document.body ) {
+				var observer = new MutationObserver( sweep );
+				observer.observe( document.body, { childList: true, subtree: true } );
+				window.setTimeout( function() {
+					observer.disconnect();
+				}, 10000 );
+			}
+		} )();
+		</script>
+		<?php
 	}
 
 	/*
@@ -905,13 +1085,82 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	}
 
 	/**
-	 * Checks whether 3rd-party injection squashing should be active.
+	 * Checks whether 3rd-party injection squashing applies to this request.
+	 *
+	 * Deliberately does NOT call is_active_for_user(). Squashing shares that
+	 * method's target-roles list and bypass, but not its Beaver Builder
+	 * dependency, its layout requirement, or its dashboard-only scope -
+	 * suppressing another plugin's nag has nothing to do with whether a
+	 * canvas layout is assigned, and needs to work on every admin screen.
 	 *
 	 * @since 1.3.0
+	 * @param WP_Screen|null $screen The current admin screen.
 	 * @return bool
 	 */
-	public static function should_squash() {
-		return (bool) get_option( self::SQUASH_OPTION, false ) && self::is_active_for_user();
+	public static function should_squash( $screen = null ) {
+		// Emergency bypass for administrators.
+		if ( isset( $_GET['bbca_bypass'] ) && current_user_can( 'manage_options' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return false;
+		}
+
+		if ( ! get_option( self::SQUASH_OPTION, false ) ) {
+			return false;
+		}
+
+		if ( self::is_exempt_screen( $screen ) ) {
+			return false;
+		}
+
+		$target_roles = (array) get_option( self::ROLES_OPTION, [] );
+
+		if ( empty( $target_roles ) ) {
+			return false;
+		}
+
+		$user = wp_get_current_user();
+
+		return (bool) array_intersect( $target_roles, (array) $user->roles );
+	}
+
+	/**
+	 * Checks whether the current screen is exempt from squashing.
+	 *
+	 * On these screens the notices are the point: they carry install,
+	 * update and activation results, and suppressing them would leave the
+	 * user unable to tell whether an action succeeded.
+	 *
+	 * Beaver Builder's editor needs no entry here - it is a front-end
+	 * request, so `current_screen` never fires and squashing never
+	 * registers.
+	 *
+	 * @since 1.4.0
+	 * @param WP_Screen|null $screen The current admin screen.
+	 * @return bool
+	 */
+	private static function is_exempt_screen( $screen ) {
+		$exempt = [
+			'update-core',
+			'update',
+			'plugins',
+			'plugin-install',
+			'plugin-editor',
+			'themes',
+			'theme-install',
+			'theme-editor',
+			'site-health',
+		];
+
+		$exempt = (array) apply_filters( 'onedog_bbca_squash_exempt_screens', $exempt );
+
+		if ( ! $screen instanceof WP_Screen ) {
+			$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		}
+
+		if ( ! $screen instanceof WP_Screen ) {
+			return false;
+		}
+
+		return in_array( $screen->id, $exempt, true );
 	}
 }
 

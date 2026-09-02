@@ -2,9 +2,72 @@
 
 ## Release state
 
-**`main` is at v1.4.0** as of the Column Sorting & Filtering module. Previous: v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.5.0** as of the 3rd-Party Injection Squashing rewrite. Previous: v1.4.0 (Column Sorting & Filtering), v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.4.0 (Column Sorting & Filtering)
+## Current Phase: v1.5.0 (3rd-Party Injection Squashing Rewrite)
+
+### v1.5.0 Modifications
+
+**Squashing was never meant to touch the admin bar.** The feature exists to remove the notices and popup interruptions other plugins inject into the admin *body*. `squash_toolbar()` also stripped admin bar nodes, which was outside its purpose and is what produced the reported toolbar/menu visibility problems.
+
+**The toolbar code did not even do what it claimed.** It removed every node where `empty( $node->parent )` and the id was not in a five-item whitelist. At `wp_before_admin_bar_render` that predicate matches genuine top-level items *and* the two container groups core registers in `WP_Admin_Bar::initialize()` — `root-default` and `top-secondary` — neither whitelisted. At render, `_bind()` re-parents top-level nodes into `root-default` and drops any node whose parent no longer exists, so the whitelisted survivors (`site-name`, `my-account`, `logout`) were discarded along with everything else. The result was a gutted toolbar, not a trimmed one.
+
+**Two further defects found while tracing it**, both meaning squashing had never done the job it was named for:
+
+- **It only ran on the dashboard.** `setup_squash()` was called from `setup_dashboard()`, which returns early unless `'dashboard' === $screen->id`. On that one screen the canvas CSS already hides everything in `#wpbody-content` except itself, so squashing was near-redundant exactly where it ran and absent everywhere it would have helped.
+- **It could not catch popups at all.** The mechanism was an output buffer spanning `admin_notices` → `all_admin_notices`. Modal overlays are injected on `admin_footer` with their own markup and never pass through that buffer.
+
+**Fixes applied:**
+
+1. **Toolbar stripping deleted** — `squash_toolbar()` and its `wp_before_admin_bar_render` registration are gone. Squashing no longer references `$wp_admin_bar`. The two deliberate, separately-toggled toolbar features are untouched: `remove_wp_logo()` under the branding toggle, and `OneDog_BBCA_Notice_Cleaner`'s own toolbar options.
+2. **Independent entry point** — squashing hooks `current_screen` at priority 11 via `maybe_setup_squash()`, no longer riding along with `setup_dashboard()`. It now runs on every admin screen.
+3. **Decoupled from the canvas** — the rewritten `should_squash()` deliberately does not call `is_active_for_user()`. It shares that method's target-roles list and `?bbca_bypass=1` escape hatch, but not its Beaver Builder dependency, its layout requirement, or its dashboard-only scope. Suppressing another plugin's nag has nothing to do with whether a canvas layout is assigned.
+4. **Third-party-only notice removal replaces the output buffer** — on `in_admin_header`, `remove_third_party_notices()` walks `$wp_filter` for the four notice hooks and resolves each callback to its defining file via `ReflectionFunction` / `ReflectionMethod`. Callbacks defined under `WP_PLUGIN_DIR` or `WPMU_PLUGIN_DIR` are removed; those in `wp-admin`/`wp-includes` are core and survive, so "Settings saved", activation results and update failures still reach targeted roles. This is the distinction the buffer could not make — it discarded everything printed between two hooks, core messages included, which was tolerable while it was dashboard-only and is not once it is admin-wide. Anything unresolvable (internal functions, exotic callables) is left registered rather than silently dropped. `start_notice_buffer()`, `end_notice_buffer()` and `$ob_level` are deleted along with the buffer's nesting-level fragility.
+5. **Popup suppression added** — `squash_popup_css()` hides matched overlays so they never flash, and `squash_popup_script()` removes them from the DOM and releases any `body` scroll lock they left behind. The lock is only released when something actually matched, so a legitimate modal this does not hide keeps its own. A `MutationObserver` catches late injections and disconnects after ten seconds rather than watching for the life of the page.
+6. **Exempt screens** — `update-core`, `update`, `plugins`, `plugin-install`, `plugin-editor`, `themes`, `theme-install`, `theme-editor`, `site-health`. On these the notices *are* the feedback for what the user just did. Beaver Builder's editor needs no entry: it is a front-end request, so `current_screen` never fires and squashing never registers.
+7. **Narrowed the CSS net** — `squash_notice_css()` matched a blanket `.notice, .update-nag, .error, .updated`, which hid every message on the screen including WordPress's own. It is now scoped to promotional wording.
+8. **Corrected the settings copy** — `src/components/DashboardCanvas.jsx` described the old behavior ("strips non-essential toolbar nodes") and is how the feature's purpose got misread. It now states that squashing leaves the admin bar and admin menu untouched. It also no longer claims dashboard widgets are part of squashing: `clear_widgets()` is registered unconditionally by `setup_dashboard()` as part of replacing the dashboard and has never been under the squash toggle.
+
+**Honest limitation on popups.** There is no structural signal separating a plugin's upsell modal from a legitimate one, so `popup_selectors()` is a blocklist, not a general rule. The defaults match promotional wording in class and id attributes rather than naming individual plugins, since plugin-specific class names could not be verified without inspecting the live DOM. Core and Beaver Builder UI (`.media-modal`, `#TB_window`, `.fl-builder-*`) are deliberately excluded. Expect this list to need tuning against real offenders.
+
+**New filters:**
+
+| Filter | Purpose |
+|--------|---------|
+| `onedog_bbca_squash_selectors` | Add popup selectors for a specific site without a plugin release |
+| `onedog_bbca_squash_exempt_screens` | Change which screens are exempt from squashing |
+
+**Files changed:**
+- `includes/modules/class-dashboard-canvas.php` — Deleted `squash_toolbar()`, `start_notice_buffer()`, `end_notice_buffer()`, `$ob_level`; added `maybe_setup_squash()`, `notice_hooks()`, `remove_third_party_notices()`, `is_third_party_callback()`, `popup_selectors()`, `squash_popup_css()`, `squash_popup_script()`, `is_exempt_screen()`; rewrote `should_squash()` and `squash_notice_css()`.
+- `src/components/DashboardCanvas.jsx` — Squash card copy.
+- `beaver-builder-custom-admin.php`, `package.json`, `readme.txt` — Version `1.5.0`, changelog, upgrade notice.
+- `build/*` — Regenerated.
+- `STATE.md` — This section.
+
+No option keys changed, so there is no data migration: `onedog_bbca_canvas_enable_squash` and `onedog_bbca_canvas_target_roles` carry over, and `classes/class-onedog-bb-rest.php` needed no edit.
+
+**Released to `main`** via `claude/admin-menu-version-access-hhxlc0`. A distributable build is produced with `bin/build-zip.sh`.
+
+**Tested off-site under a WordPress stub harness** (`ReflectionMethod`/`ReflectionFunction` resolution and the gate), not yet on ott-dev:
+
+- Notice filtering: plain function, static method and instance method callbacks defined under a fake plugin dir were removed across `admin_notices` and `all_admin_notices`; core-defined callbacks, an internal function (`strlen`, no defining file) and an unresolvable callback were all kept.
+- Gate: 13 cases covering targeted/non-targeted roles, toggle off, empty target roles, each exempt screen, admin bypass, the bypass param held by a non-admin, and confirmation that squashing activates with no Beaver Builder and no layout assigned.
+
+**Live verification still to run on ott-dev**, as a targeted non-admin role:
+
+- Admin bar renders normally on every screen with squashing on — this is the regression that started this, check it first
+- Admin menu unchanged with squashing on vs. off
+- A known plugin nag is gone, but saving a Settings page still shows "Settings saved."
+- A nag suppressed on the dashboard is also suppressed on `edit.php` and `upload.php`
+- `plugins.php` and `update-core.php` still show their notices
+- The offending overlays stay hidden and the page still scrolls behind them
+- The media modal still opens on `upload.php`; the Beaver Builder editor still loads
+- Toggling squashing off restores everything
+- `?bbca_bypass=1` as an administrator disables squashing
+
+---
+
+## Historical Phase: v1.4.0 (Column Sorting & Filtering)
 
 ### v1.4.0 Modifications
 
