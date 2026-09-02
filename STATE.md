@@ -2,9 +2,33 @@
 
 ## Release state
 
-**`main` is at v1.6.0** as of the Premium Plugin Menu Restrictor support. Previous: v1.5.0 (3rd-Party Injection Squashing rewrite), v1.4.0 (Column Sorting & Filtering), v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.6.1** as of the Menu Restrictor label and late-removal fixes. Previous: v1.6.0 (Premium Plugin Menu Restrictor support), v1.5.0 (3rd-Party Injection Squashing rewrite), v1.4.0 (Column Sorting & Filtering), v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.6.0 (Premium Plugin Menu Restrictor)
+## Current Phase: v1.6.1 (Menu Restrictor Polishing)
+
+### v1.6.1 Modifications
+
+**Fixed three Menu Restrictor issues observed on ott-dev.onedog.solutions.**
+
+1. **Trailing numbers on menu labels.** WordPress embeds update/notification counts inside menu labels as HTML spans. The restrictor was running `strip_tags()` directly, leaving the bare number behind and producing labels like "Plugins 0" and "Site Health 0". A new `sanitize_menu_label()` helper now strips `update-plugins`, `awaiting-mod`, and `menu-counter` spans before removing remaining tags.
+
+2. **LiteSpeed Cache missing from the restrictor list.** LiteSpeed Cache guards its `admin_menu` registration behind `is_admin()`, so it is not discovered by the REST-context dynamic scan. A built-in supplemental mapping was added to `get_extra_menu_items()`: slug `litespeed`, label "LiteSpeed Cache". It now appears in the "Premium / Custom Menus" section and can be hidden per role.
+
+3. **WP fail2ban remained visible after being blocked.** BBCA removed menus at `admin_menu` priority `9999`. WP fail2ban registers an `admin_menu_fix` callback at `PHP_INT_MAX`, and Freemius-driven plugins manipulate the menu at priority `999999999`; either of these could re-add or re-parent a menu after BBCA had already processed it. A final `remove_menus()` pass was added on `admin_head` priority `1`, after all menu registration is complete but before the sidebar HTML is rendered.
+
+**Files changed:**
+- `includes/modules/class-menu-visibility.php` — added `sanitize_menu_label()`, applied it to dynamic top-level and submenu labels, added LiteSpeed Cache built-in mapping, and registered the `admin_head` cleanup hook.
+- `beaver-builder-custom-admin.php`, `package.json`, `readme.txt` — version `1.6.1`, changelog, upgrade notice.
+- `build/` — rebuilt.
+
+**Verification on ott-dev.onedog.solutions:**
+- REST endpoint `/onedog-bbca/v1/menu-visibility` returns "Plugins", "Site Health", and "Updates" without trailing numbers.
+- LiteSpeed Cache appears under "Premium / Custom Menus".
+- WP fail2ban is hidden from the admin sidebar for the `site_admin` role.
+
+---
+
+## Historical Phase: v1.6.0 (Premium Plugin Menu Restrictor)
 
 ### v1.6.0 Modifications
 

@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,11 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.6.1 =
+* Fixed trailing numbers on menu labels in the Menu Restrictor (e.g. "Plugins 0", "Site Health 0") by stripping WordPress update/notification count spans before removing remaining HTML tags.
+* Added built-in supplemental mapping for LiteSpeed Cache so it appears in the "Premium / Custom Menus" section and can be hidden per role.
+* Hardened menu removal against plugins that re-add or manipulate admin menus after the admin_menu hook by running a final cleanup pass on admin_head.
 
 = 1.6.0 =
 * New "Premium / Custom Menus" section in the Menu Restrictor for plugins whose admin menus are not discovered automatically because they guard admin_menu behind is_admin().
@@ -178,6 +183,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.6.1 =
+Fixes trailing update-count numbers on Menu Restrictor labels, adds LiteSpeed Cache to the hideable menu list, and ensures blocked menus stay hidden when other plugins manipulate the menu late. Recommended for all sites using the Menu Restrictor.
 
 = 1.6.0 =
 The Menu Restrictor can now hide admin menus from plugins that were not detected automatically, starting with SEOPress. No action is required unless you want to use the new Premium / Custom Menus section.

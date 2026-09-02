@@ -70,6 +70,8 @@ final class OneDog_BBCA_Menu_Visibility {
 	public static function init() {
 		// Late priority so all menus are registered before we remove them.
 		add_action( 'admin_menu', [ __CLASS__, 'remove_menus' ], 9999 );
+		// Final pass after any plugin that re-adds menus at PHP_INT_MAX (e.g. WP fail2ban, Freemius).
+		add_action( 'admin_head', [ __CLASS__, 'remove_menus' ], 1 );
 		add_action( 'wp_before_admin_bar_render', [ __CLASS__, 'remove_toolbar_nodes' ], 9999 );
 
 		// Block direct URL access to restricted pages.
@@ -211,6 +213,22 @@ final class OneDog_BBCA_Menu_Visibility {
 	}
 
 	/**
+	 * Cleans a menu label by stripping WordPress update/notification count spans.
+	 *
+	 * WordPress embeds counts (e.g. plugin updates) inside the label as HTML spans.
+	 * Removing the spans before `strip_tags()` prevents trailing numbers such as "Plugins 0".
+	 *
+	 * @since 1.6.1
+	 * @param string $label Raw menu label.
+	 * @return string
+	 */
+	private static function sanitize_menu_label( $label ) {
+		$label = preg_replace( '/\s?<span[^>]*class="[^"]*(?:update-plugins|awaiting-mod|menu-counter)[^"]*"[^>]*>.*?<\/span>/i', '', $label );
+		$label = strip_tags( $label );
+		return trim( $label );
+	}
+
+	/**
 	 * Returns the current user's primary role.
 	 *
 	 * @since 0.3.0
@@ -309,6 +327,15 @@ final class OneDog_BBCA_Menu_Visibility {
 						'type'  => 'submenu',
 					],
 				],
+			];
+		}
+
+		// LiteSpeed Cache — guards admin_menu behind is_admin(), so it is not discovered via REST.
+		if ( self::is_plugin_active( 'litespeed-cache/litespeed-cache.php' ) ) {
+			$extra[] = [
+				'slug'  => 'litespeed',
+				'label' => __( 'LiteSpeed Cache', 'bb-custom-admin' ),
+				'type'  => 'menu',
 			];
 		}
 
@@ -457,7 +484,7 @@ final class OneDog_BBCA_Menu_Visibility {
 			}
 
 			$slug  = $item[2];
-			$label = strip_tags( $item[0] );
+			$label = self::sanitize_menu_label( $item[0] );
 
 			$entry = [
 				'slug'    => $slug,
@@ -471,7 +498,7 @@ final class OneDog_BBCA_Menu_Visibility {
 				foreach ( $submenu[ $slug ] as $sub ) {
 					$entry['children'][] = [
 						'slug'  => 'submenu:' . $slug . '>' . $sub[2],
-						'label' => strip_tags( $sub[0] ),
+						'label' => self::sanitize_menu_label( $sub[0] ),
 						'type'  => 'submenu',
 					];
 				}
