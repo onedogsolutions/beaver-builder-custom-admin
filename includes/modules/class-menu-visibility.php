@@ -62,6 +62,24 @@ final class OneDog_BBCA_Menu_Visibility {
 	const CUSTOM_MENU_ITEMS_OPTION = 'onedog_bbca_menu_visibility_custom_items';
 
 	/**
+	 * Option key for the cached available-menus list.
+	 *
+	 * get_available_menus() has to bootstrap the entire wp-admin menu
+	 * builder in REST context — every plugin's admin_menu callbacks run —
+	 * which measured ~300ms and 26 queries on a normal plugin load-out.
+	 * The result is cached until the plugin set, theme, or restriction
+	 * settings change.
+	 *
+	 * Stored as a non-autoloaded option rather than a transient: an
+	 * object-cache drop-in without a persistent backend makes transients
+	 * per-request on affected hosts.
+	 *
+	 * @since 1.6.2
+	 * @var string
+	 */
+	const MENU_CACHE_KEY = 'onedog_bbca_available_menus';
+
+	/**
 	 * Initializes hooks.
 	 *
 	 * @since 0.3.0
@@ -76,6 +94,15 @@ final class OneDog_BBCA_Menu_Visibility {
 
 		// Block direct URL access to restricted pages.
 		add_action( 'admin_init', [ __CLASS__, 'block_direct_access' ], 9999 );
+
+		// Cache invalidation for the available-menus list: the plugin set,
+		// the theme, or the restriction settings changing is what makes the
+		// cached snapshot wrong.
+		add_action( 'activated_plugin', [ __CLASS__, 'flush_menu_cache' ] );
+		add_action( 'deactivated_plugin', [ __CLASS__, 'flush_menu_cache' ] );
+		add_action( 'after_switch_theme', [ __CLASS__, 'flush_menu_cache' ] );
+		add_action( 'updated_option', [ __CLASS__, 'maybe_flush_menu_cache' ] );
+		add_action( 'added_option', [ __CLASS__, 'maybe_flush_menu_cache' ] );
 	}
 
 	/**
@@ -453,7 +480,9 @@ final class OneDog_BBCA_Menu_Visibility {
 	/**
 	 * Returns the list of registered top-level admin menu items.
 	 *
-	 * Used by the REST API to populate the settings UI.
+	 * Used by the REST API to populate the settings UI. The REST path has to
+	 * bootstrap the wp-admin menu builder (see MENU_CACHE_KEY), so its merged
+	 * result is served from a non-autoloaded option until invalidated.
 	 *
 	 * @since 0.3.0
 	 * @return array
@@ -463,12 +492,24 @@ final class OneDog_BBCA_Menu_Visibility {
 
 		$items = [];
 
+		$cache_ttl = 0;
+
 		// REST/AJAX requests skip the wp-admin bootstrap, so the $menu and
 		// $submenu globals are never built there. Load the admin API files and
 		// the menu builder on demand so plugin-registered pages are included.
 		// Note: plugins that guard their admin_menu callbacks behind is_admin()
 		// will not appear, since is_admin() is false in a REST context.
 		if ( ! is_array( $menu ) ) {
+			$cache_ttl = self::menu_cache_ttl();
+
+			if ( $cache_ttl > 0 ) {
+				$cached = get_option( self::MENU_CACHE_KEY );
+				if ( is_array( $cached ) && is_array( $cached['items'] ?? null )
+					&& (int) ( $cached['ts'] ?? 0 ) + $cache_ttl > time() ) {
+					return $cached['items'];
+				}
+			}
+
 			require_once ABSPATH . 'wp-admin/includes/admin.php';
 			require_once ABSPATH . 'wp-admin/menu.php';
 		}
@@ -509,7 +550,70 @@ final class OneDog_BBCA_Menu_Visibility {
 
 		$items = self::merge_extra_menu_items( $items );
 
+		if ( $cache_ttl > 0 ) {
+			$value = [
+				'ts'    => time(),
+				'items' => $items,
+			];
+
+			// add_option() first so the row is created with autoload off; the
+			// update path leaves the existing autoload flag untouched.
+			if ( ! add_option( self::MENU_CACHE_KEY, $value, '', false ) ) {
+				update_option( self::MENU_CACHE_KEY, $value );
+			}
+		}
+
 		return $items;
+	}
+
+	/**
+	 * Returns the TTL for the available-menus cache entry, in seconds.
+	 *
+	 * @since 1.6.2
+	 * @return int Zero disables the cache.
+	 */
+	private static function menu_cache_ttl() {
+		/**
+		 * Filters how long the discovered admin menu tree stays cached.
+		 *
+		 * @since 1.6.2
+		 *
+		 * @param int $ttl Cache lifetime in seconds. 0 disables caching.
+		 */
+		return (int) apply_filters( 'onedog_bbca_menu_cache_ttl', HOUR_IN_SECONDS );
+	}
+
+	/**
+	 * Deletes the cached available-menus list.
+	 *
+	 * @since 1.6.2
+	 * @return void
+	 */
+	public static function flush_menu_cache() {
+		delete_option( self::MENU_CACHE_KEY );
+	}
+
+	/**
+	 * Deletes the cached available-menus list when a restriction option changes.
+	 *
+	 * Hooked to updated_option/added_option so REST saves and configuration
+	 * imports invalidate the cache without each writer needing an explicit
+	 * flush call.
+	 *
+	 * @since 1.6.2
+	 * @param string $option Option name being saved.
+	 * @return void
+	 */
+	public static function maybe_flush_menu_cache( $option ) {
+		$watched = [
+			self::MENU_OPTION,
+			self::EXTRA_MENU_OPTION,
+			self::CUSTOM_MENU_ITEMS_OPTION,
+		];
+
+		if ( in_array( $option, $watched, true ) ) {
+			self::flush_menu_cache();
+		}
 	}
 
 	/**

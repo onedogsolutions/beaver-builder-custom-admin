@@ -2,9 +2,86 @@
 
 ## Release state
 
-**`main` is at v1.6.1** as of the Menu Restrictor label and late-removal fixes. Previous: v1.6.0 (Premium Plugin Menu Restrictor support), v1.5.0 (3rd-Party Injection Squashing rewrite), v1.4.0 (Column Sorting & Filtering), v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
+**`main` is at v1.6.2** as of the admin performance work. Previous: v1.6.1 (Menu Restrictor label and late-removal fixes), v1.6.0 (Premium Plugin Menu Restrictor support), v1.5.0 (3rd-Party Injection Squashing rewrite), v1.4.0 (Column Sorting & Filtering), v1.3.6 (settings page returned to the Settings menu), v1.3.5 (admin canvas styling-asset fix), v1.3.4 (settings-page menu relocation), v1.3.3 (Dashboard Canvas admin-menu overlap fix), v1.3.2 (Dashboard Canvas layout fix), v1.3.1 (Welcome Screen removal + minor version bump), v1.3.0 (Dashboard Canvas & 3rd-Party Squashing), v1.2.0 (Option Cleaner removal + Menu Restrictor fix), v1.1.0 (Option Cleaner), v1.0.1 (settings loading fix), v1.0.0 (Phase 3 - Role Editor, Menu Restrictor, Tailwind CSS), v0.2.0 (Phase 2 - React settings UI), v0.1.0 (Phase 1 - fork and modernization).
 
-## Current Phase: v1.6.1 (Menu Restrictor Polishing)
+## Current Phase: v1.6.2 (Admin Performance: Query & Render Efficiency)
+
+### v1.6.2 Modifications
+
+**The admin area had become slow.** Live profiling on ott-dev (BBCA v1.6.1, all modules on, 11,756 posts / 293,062 postmeta rows / 40 users, persistent object cache) via Novamira's `execute-php` found two dominant costs and two latent ones:
+
+| Cost | Path | Trigger |
+|------|------|---------|
+| ~950ms + 15 queries | `render_canvas()` → `do_shortcode('[fl_builder_insert_layout id="33"]')` | Every dashboard load (all 8 roles targeted) |
+| ~317ms + 26 queries + 76 PHP warnings | `get_available_menus()` bootstraps `wp-admin/includes/admin.php` + `wp-admin/menu.php` in REST context | Every `/menu-visibility` REST call |
+| N+1 latent | `build_type_map()` on `admin_init` → Pods `load_pods()` + `load_pod()` per pod | Every admin page (cheap only where a persistent object cache absorbs Pods) |
+| Unbounded latent | Filter dropdowns: DISTINCT meta_value query per non-trivial column; unknown **user** columns queried **postmeta** | Users/orders list screens with filtering on and no `filter_columns` configured |
+
+Verified non-issues, deliberately unchanged: the squash reflection pass (~0.1ms), repeated `get_option()` reads (per-request object cache), and on-demand `meta_value` sorting when a user clicks a sortable column.
+
+**Solutions:**
+
+1. **Dashboard Canvas HTML cache.** `render_canvas()` serves the inner layout HTML from the non-autoloaded option `onedog_bbca_canvas_cache` (15-minute TTL; the `#bbca-custom-dashboard-canvas` wrapper stays dynamic). The render is captured with output buffering so BB modules that echo instead of return are cached faithfully; an empty render is treated as a miss so a single failed render is never pinned. Invalidated on `save_post` for the assigned layout, `fl_builder_after_save_layout` / `fl_builder_after_save_draft` (both confirmed against bb-plugin 2.11 on ott-dev: post ID arrives first), `fl_builder_cache_cleared` (argument-less, flushes the assigned layout), and REST saves/imports that change `canvas_layout_id`. Master filter `onedog_bbca_canvas_cache` (return false to disable); TTL filter `onedog_bbca_canvas_cache_ttl`.
+
+2. **Menu Restrictor discovery cache.** `get_available_menus()` serves the merged tree (dynamic menus + supplemental items + custom items) from the non-autoloaded option `onedog_bbca_available_menus`, TTL one hour, filter `onedog_bbca_menu_cache_ttl`. Only the REST path — where `$menu` is not yet built — consults and populates the cache; an admin-context call returns the live tree uncached. Invalidated on `activated_plugin`, `deactivated_plugin`, `after_switch_theme`, and through `updated_option`/`added_option` hooks watching the three restriction option keys, so REST saves and config imports flush it without explicit writer cooperation. The 76 PHP warnings from `wp-admin/includes/menu.php` now fire only on cache regeneration. Labels are safe to cache: `sanitize_menu_label()` already strips update-count spans. Role enforcement in `remove_menus()`/`block_direct_access()` is untouched.
+
+3. **Lazy column type map.** `build_type_map()` no longer runs on `admin_init`; `$type_map` is null until `detect_column_type()` or the new `is_known_column_type()` needs it. Pods/GF/WooCommerce discovery no longer runs on the dashboard, editor, settings, or any non-list admin page. `build_type_map()` stays public (REST + tests call it).
+
+4. **Integration map caching + Pods N+1 fix.** The WooCommerce, Gravity Forms, and Pods maps are cached in non-autoloaded options (one-hour TTL; keys `onedog_bbca_cs_wc_map` / `_gf_` / `_pods_`), invalidated on `activated_plugin`/`deactivated_plugin`. Pods discovery is now a single full `load_pods()` call — which returns complete pods including fields — instead of a names/ids list plus one `load_pod()` per pod. Array-access syntax serves both legacy plain arrays and `Pods\Whatsit\*` objects.
+
+5. **Filter dropdown bounding.** With no `filter_columns` configured, automatic dropdowns require a known, screen-appropriate type: core fields with a meaningful value set (status, author, role), taxonomy columns, or integration-mapped meta. Unknown columns — usually custom renderer columns, not meta — get no dropdown, so the users screen no longer runs postmeta DISTINCT queries for them. `get_meta_options()` results are cached in non-autoloaded options per (meta table, meta key) for 15 minutes (`onedog_bbca_filter_opts_*`), and meta options resolve against the table the screen implies (usermeta on users, commentmeta on comments) rather than always postmeta. Explicitly configured `filter_columns` lists are still honoured as-is.
+
+6. **Drive-by fix.** `manage_edit-{post_type}_sortable_columns` had been registered as a literal hook name WordPress never fires, so CPT sortable columns never registered. The dead registration is removed; `register_cpt_sortable()` on `current_screen` builds the real per-post-type hook name and covers all CPT screens.
+
+**Why options, not transients.** Live verification on ott-dev found the LiteSpeed object-cache drop-in present with no persistent backend configured (`wp_using_ext_object_cache()` returns true, yet a probe set in one request is gone in the next), which makes every transient on that host per-request. All four caches therefore live in non-autoloaded options (created via `add_option( …, false )`, updated via `update_option()`, so they never load on front-end requests) with an embedded timestamp enforcing the TTL window and `delete_option()` on invalidation. On healthy hosts — a persistent object cache, or no drop-in at all — options are served from the object cache just like transients, so nothing is lost; on hosts like ott-dev it is the difference between the caches working and not existing. Site-level recommendation recorded below: enable a real object-cache backend.
+
+**New filters:**
+
+| Filter | Purpose |
+|--------|---------|
+| `onedog_bbca_canvas_cache` | Return false to disable dashboard canvas HTML caching. |
+| `onedog_bbca_canvas_cache_ttl` | Canvas HTML cache lifetime in seconds (default 900). |
+| `onedog_bbca_menu_cache_ttl` | Menu tree cache lifetime in seconds (default 3600; 0 disables). |
+
+**Files changed:**
+- `includes/modules/class-dashboard-canvas.php` — `LAYOUT_CACHE_KEY`, `get_layout_html()`, `read_layout_cache()`, `write_layout_cache()`, `layout_cache_ttl()`, `flush_layout_cache()`, invalidation hooks in `init()`, `render_canvas()` rewritten.
+- `includes/modules/class-menu-visibility.php` — `MENU_CACHE_KEY`, option read/write in `get_available_menus()`, `menu_cache_ttl()`, `flush_menu_cache()`, `maybe_flush_menu_cache()`, invalidation hooks in `init()`.
+- `includes/modules/class-column-sorting.php` — lazy `$type_map` (null sentinel), `is_known_column_type()`, `admin_init` registration and the dead literal sortable filter removed.
+- `includes/modules/class-column-sorting-integrations.php` — option-backed map cache constants, `cached_map()`, `build_*_map()` builders, single-`load_pods()` Pods builder, `flush_integration_caches()`.
+- `includes/modules/class-column-sorting-filters.php` — `OPTIONS_CACHE_TTL`, `is_auto_filterable_column()`, screen-aware `get_filter_options()` with `meta_context_for_screen()`, option-cached `get_meta_options()`.
+- `classes/class-onedog-bb-rest.php` — canvas layout change flush in `save_dashboard_canvas()` and `import_config()`.
+- `beaver-builder-custom-admin.php`, `package.json`, `readme.txt` — version `1.6.2`, changelog, upgrade notice.
+- `build/` — rebuilt.
+
+### Release engineering for v1.6.2
+
+**The first build used transients; live verification killed them.** v1.6.2 was initially packaged with all four caches in transients. Deployed to ott-dev, the canvas "warm" cross-process render still cost 619ms — the LiteSpeed object-cache drop-in is present with no persistent backend (`wp_using_ext_object_cache()` true, `litespeed.conf.object*` absent, a probe transient set in one request gone in the next), so every transient on that host is per-request. All four cache layers were converted to non-autoloaded options ("Why options, not transients" above), the local stub harness was extended to 108 assertions — option presence, autoload-off rows, TTL expiry, layout-mismatch miss, stale-entry rejection — with 108/108 passing, and the zip was rebuilt and redeployed. The rewrite folded `layout_cache_key()` into the `LAYOUT_CACHE_KEY` constant and removed the method.
+
+**Live verification on ott-dev (v1.6.2, all modules on) via Novamira `execute-php`** — each snippet runs in a fresh PHP process, so every warm read is a true cross-process read:
+
+| Check | Result |
+|-------|--------|
+| Canvas cold render (layout 33) | 615.6ms, 12,729 bytes, md5 `d72e41ee…` — byte-identical to the v1.6.1-era render |
+| Canvas warm render | **0.34ms** (619ms on the transient build) |
+| Canvas parity | warm output md5 === fresh-after-flush md5; cache repopulates on the fresh render |
+| Menu cold build | 323.2ms, 23 top-level + 101 submenus, option row autoload `off` (16 KB) |
+| Menu warm read | 0.22ms; warm REST `GET /menu-visibility` **0.56ms** (goal < 50ms), status 200 |
+| Menu parity | warm tree serialize-md5 === fresh-bootstrap serialize-md5 |
+| `save_post` for an unrelated post (ID 3) | canvas cache survives — the post-scoped check works |
+| `save_post` 33 / `fl_builder_after_save_layout` / `fl_builder_cache_cleared` | each flushes the canvas option |
+| `activated_plugin` / `deactivated_plugin` | each flushes the menu option and both integration-map options |
+| REST `POST /menu-visibility` (real `rest_do_request()` as admin) | status 200, menu option flushed; menu rules restored byte-identically afterwards |
+| Integration maps | wc + pods cached (gf absent — Gravity Forms not installed); warm rebuild 0.09ms |
+| Users screen dropdowns, cold | 4 dropdowns (name / email / registered / role, the configured set honoured); **zero postmeta queries**; the single DISTINCT correctly targets `wp_usermeta` with LIMIT 200 and lands in a 45-byte cache option. Noteworthy: the merged Pods map retypes `email` as `post_meta`, and the new screen-aware `meta_context_for_screen()` is what routes it to usermeta — exactly the wrong-table bug this release fixes |
+| Users screen dropdowns, warm | 3 option reads, zero meta queries of any kind |
+| CPT sortable (drive-by fix) | `current_screen` wiring live; a real `WP_Screen::get( 'edit-shop_order' )` + `set_current_screen()` registers `manage_edit-shop_order_sortable_columns`; applying it adds `order_status`, `billing_address`, `shipping_address`; `cb` / `wc_actions` skipped |
+| Final audit | every v1.6.2 cache row autoload `off`, settings options untouched, frontend 200, both server-side zip artifacts deleted, caches left warm |
+
+**Browser spot-check** (temporary admin user, deleted afterwards; screenshots reviewed): the dashboard renders the styled canvas from cache — welcome card, quick links, support form, recent news, default widgets gone; the Menu Restrictor tab lists all ~23 discovered menus plus the Premium / Custom Menus section (SEO, LiteSpeed Cache) with no stuck spinners; the users screen shows exactly the four bounded dropdowns, the Role dropdown opening with all 8 role names, and a fully rendered users table.
+
+---
+
+## Historical Phase: v1.6.1 (Menu Restrictor Polishing)
 
 ### v1.6.1 Modifications
 

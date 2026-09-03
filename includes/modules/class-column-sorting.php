@@ -50,9 +50,13 @@ final class OneDog_BBCA_Column_Sorting {
 	/**
 	 * Column type map populated by integrations.
 	 *
-	 * @var array<string, array> column_name => type descriptor
+	 * Null until first needed: building it touches the Pods, Gravity Forms
+	 * and WooCommerce APIs, which has no business running on requests that
+	 * never sort or filter a list table. See detect_column_type().
+	 *
+	 * @var array<string, array>|null column_name => type descriptor
 	 */
-	private static $type_map = [];
+	private static $type_map = null;
 
 	/**
 	 * Runtime cache of discovered columns per screen.
@@ -68,9 +72,6 @@ final class OneDog_BBCA_Column_Sorting {
 	 * @return void
 	 */
 	public static function init() {
-		// Build the column type map once admin is loaded.
-		add_action( 'admin_init', [ __CLASS__, 'build_type_map' ], 5 );
-
 		// Register sortable columns on every list screen.
 		add_filter( 'manage_posts_columns',         [ __CLASS__, 'tag_post_columns' ], 999, 2 );
 		add_filter( 'manage_pages_columns',         [ __CLASS__, 'tag_post_columns' ], 999, 2 );
@@ -84,9 +85,6 @@ final class OneDog_BBCA_Column_Sorting {
 		add_filter( 'manage_upload_sortable_columns',            [ __CLASS__, 'register_sortable' ] );
 		add_filter( 'manage_edit-comments_sortable_columns',     [ __CLASS__, 'register_sortable' ] );
 		add_filter( 'manage_users_sortable_columns',             [ __CLASS__, 'register_sortable' ] );
-
-		// Dynamic CPT sortable columns.
-		add_filter( 'manage_edit-{post_type}_sortable_columns', [ __CLASS__, 'register_sortable' ] );
 
 		// Query handlers.
 		add_action( 'pre_get_posts',    [ __CLASS__, 'handle_post_sorting' ] );
@@ -196,6 +194,10 @@ final class OneDog_BBCA_Column_Sorting {
 	/**
 	 * Builds the column type map, including integration-provided entries.
 	 *
+	 * Runs lazily on the first detect_column_type() call rather than on
+	 * every admin request. The REST handler and tests may also call it
+	 * directly.
+	 *
 	 * @since 1.4.0
 	 * @return void
 	 */
@@ -251,6 +253,11 @@ final class OneDog_BBCA_Column_Sorting {
 	 * @return array Type descriptor with at minimum a 'type' key.
 	 */
 	public static function detect_column_type( $column_name ) {
+		// Build the map on first use; see the $type_map docblock.
+		if ( null === self::$type_map ) {
+			self::build_type_map();
+		}
+
 		// Direct match in type map.
 		if ( isset( self::$type_map[ $column_name ] ) ) {
 			return self::$type_map[ $column_name ];
@@ -271,6 +278,29 @@ final class OneDog_BBCA_Column_Sorting {
 			'meta_key' => $column_name,
 			'numeric'  => false,
 		];
+	}
+
+	/**
+	 * Checks whether a column has an explicit, known type.
+	 *
+	 * Columns absent from the type map are usually custom renderer columns
+	 * (an icon, a button, a value computed at render time), not stored meta,
+	 * so a filter dropdown built for them would query the database for a
+	 * meta key that may not exist — on a table chosen by guesswork. Callers
+	 * that need only trustworthy columns use this instead of
+	 * detect_column_type(), whose meta fallback is deliberately optimistic.
+	 *
+	 * @since 1.6.2
+	 * @param string $column_name Column name.
+	 * @return bool
+	 */
+	public static function is_known_column_type( $column_name ) {
+		if ( null === self::$type_map ) {
+			self::build_type_map();
+		}
+
+		return isset( self::$type_map[ $column_name ] )
+			|| 0 === strpos( (string) $column_name, 'taxonomy-' );
 	}
 
 	/*

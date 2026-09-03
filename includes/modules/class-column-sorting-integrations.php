@@ -21,6 +21,34 @@ defined( 'ABSPATH' ) || exit;
 final class OneDog_BBCA_Column_Sorting_Integrations {
 
 	/**
+	 * Option key for the cached WooCommerce column map.
+	 *
+	 * @var string
+	 */
+	const WC_MAP_CACHE = 'onedog_bbca_cs_wc_map';
+
+	/**
+	 * Option key for the cached Gravity Forms column map.
+	 *
+	 * @var string
+	 */
+	const GF_MAP_CACHE = 'onedog_bbca_cs_gf_map';
+
+	/**
+	 * Option key for the cached Pods column map.
+	 *
+	 * @var string
+	 */
+	const PODS_MAP_CACHE = 'onedog_bbca_cs_pods_map';
+
+	/**
+	 * How long a cached integration map stays fresh, in seconds.
+	 *
+	 * @var int
+	 */
+	const CACHE_TTL = HOUR_IN_SECONDS;
+
+	/**
 	 * Initializes hooks.
 	 *
 	 * @since 1.4.0
@@ -28,6 +56,11 @@ final class OneDog_BBCA_Column_Sorting_Integrations {
 	 */
 	public static function init() {
 		add_filter( 'onedog_bbca_column_type_map', [ __CLASS__, 'register_integrations' ] );
+
+		// Activating or deactivating a plugin changes what each adapter
+		// discovers, so the cached maps expire with the plugin set.
+		add_action( 'activated_plugin', [ __CLASS__, 'flush_integration_caches' ] );
+		add_action( 'deactivated_plugin', [ __CLASS__, 'flush_integration_caches' ] );
 	}
 
 	/**
@@ -62,13 +95,26 @@ final class OneDog_BBCA_Column_Sorting_Integrations {
 	/**
 	 * Returns column type mappings for WooCommerce columns.
 	 *
-	 * Maps WooCommerce's registered column names to their underlying
-	 * storage (post meta or custom table fields).
+	 * Cached in a non-autoloaded option; the underlying discovery only
+	 * changes when the plugin set or the store's product attributes do.
 	 *
 	 * @since 1.4.0
 	 * @return array
 	 */
 	private static function get_woocommerce_map() {
+		return self::cached_map( self::WC_MAP_CACHE, 'build_woocommerce_map' );
+	}
+
+	/**
+	 * Builds the WooCommerce column type map.
+	 *
+	 * Maps WooCommerce's registered column names to their underlying
+	 * storage (post meta or custom table fields).
+	 *
+	 * @since 1.6.2
+	 * @return array
+	 */
+	private static function build_woocommerce_map() {
 		$map = [
 			// Product list table columns.
 			'price'              => [
@@ -202,6 +248,9 @@ final class OneDog_BBCA_Column_Sorting_Integrations {
 	/**
 	 * Returns column type mappings for Gravity Forms entry columns.
 	 *
+	 * Cached in a non-autoloaded option; form fields only change when
+	 * forms are edited, which the TTL absorbs.
+	 *
 	 * GF entries are stored in the `wp_gf_entry` and `wp_gf_entry_meta`
 	 * tables. Column names typically follow the pattern `field_id_{n}`
 	 * or are core entry fields.
@@ -210,6 +259,16 @@ final class OneDog_BBCA_Column_Sorting_Integrations {
 	 * @return array
 	 */
 	private static function get_gravityforms_map() {
+		return self::cached_map( self::GF_MAP_CACHE, 'build_gravityforms_map' );
+	}
+
+	/**
+	 * Builds the Gravity Forms column type map.
+	 *
+	 * @since 1.6.2
+	 * @return array
+	 */
+	private static function build_gravityforms_map() {
 		$map = [
 			// Core GF entry fields.
 			'entry_id'      => [
@@ -280,10 +339,30 @@ final class OneDog_BBCA_Column_Sorting_Integrations {
 	 * Pods stores custom fields either as post meta (table storage)
 	 * or in custom Pods tables. This integration detects both patterns.
 	 *
+	 * Cached in a non-autoloaded option; pod definitions only change when
+	 * they are edited, which the TTL absorbs.
+	 *
 	 * @since 1.4.0
 	 * @return array
 	 */
 	private static function get_pods_map() {
+		return self::cached_map( self::PODS_MAP_CACHE, 'build_pods_map' );
+	}
+
+	/**
+	 * Builds the Pods column type map.
+	 *
+	 * One full load_pods() call returns every pod with its fields attached.
+	 * The previous shape — a names/ids list followed by one load_pod() per
+	 * pod — cost a query per pod on sites without a persistent object cache.
+	 *
+	 * Pods returns either plain arrays (legacy) or ArrayAccess objects
+	 * (Pods\Whatsit\Pod / Field); the array access syntax below serves both.
+	 *
+	 * @since 1.6.2
+	 * @return array
+	 */
+	private static function build_pods_map() {
 		$map = [];
 
 		if ( ! function_exists( 'pods_api' ) ) {
@@ -296,20 +375,20 @@ final class OneDog_BBCA_Column_Sorting_Integrations {
 			return $map;
 		}
 
-		$pods_list = $api->load_pods( [ 'names_ids' => true ] );
+		$pods_list = $api->load_pods();
 
 		if ( ! is_array( $pods_list ) ) {
 			return $map;
 		}
 
-		foreach ( $pods_list as $pod_id => $pod_name ) {
-			$pod = pods_api()->load_pod( [ 'id' => $pod_id ] );
+		foreach ( $pods_list as $pod ) {
+			$fields = $pod['fields'] ?? null;
 
-			if ( ! $pod || empty( $pod['fields'] ) || ! is_array( $pod['fields'] ) ) {
+			if ( empty( $fields ) || ! is_array( $fields ) ) {
 				continue;
 			}
 
-			foreach ( $pod['fields'] as $field_name => $field_data ) {
+			foreach ( $fields as $field_name => $field_data ) {
 				// Only map if not already in the type map.
 				if ( isset( $map[ $field_name ] ) ) {
 					continue;
@@ -326,6 +405,56 @@ final class OneDog_BBCA_Column_Sorting_Integrations {
 		}
 
 		return $map;
+	}
+
+	/**
+	 * Returns an integration map, cached across requests.
+	 *
+	 * Discovery hits the plugin APIs — and, on sites without a persistent
+	 * object cache, the database — and the results only change when the
+	 * plugin set does, so a cache entry absorbs the cost. Maps are stored
+	 * as non-autoloaded options: an object-cache drop-in without a
+	 * persistent backend makes transients per-request on affected hosts.
+	 *
+	 * @since 1.6.2
+	 * @param string $cache_key Option key.
+	 * @param string $builder   Map builder method name.
+	 * @return array
+	 */
+	private static function cached_map( $cache_key, $builder ) {
+		$cached = get_option( $cache_key );
+
+		if ( is_array( $cached ) && is_array( $cached['map'] ?? null )
+			&& (int) ( $cached['ts'] ?? 0 ) + self::CACHE_TTL > time() ) {
+			return $cached['map'];
+		}
+
+		$map = self::$builder();
+
+		$value = [
+			'ts'  => time(),
+			'map' => $map,
+		];
+
+		// add_option() first so the row is created with autoload off; the
+		// update path leaves the existing autoload flag untouched.
+		if ( ! add_option( $cache_key, $value, '', false ) ) {
+			update_option( $cache_key, $value );
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Deletes all cached integration maps.
+	 *
+	 * @since 1.6.2
+	 * @return void
+	 */
+	public static function flush_integration_caches() {
+		delete_option( self::WC_MAP_CACHE );
+		delete_option( self::GF_MAP_CACHE );
+		delete_option( self::PODS_MAP_CACHE );
 	}
 }
 

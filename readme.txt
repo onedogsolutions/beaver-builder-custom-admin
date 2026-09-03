@@ -4,7 +4,7 @@ Tags: beaver builder, dashboard canvas, admin, custom, role editor
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.6.1
+Stable tag: 1.6.2
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,15 @@ This plugin:
 All data remains local to your WordPress installation.
 
 == Changelog ==
+
+= 1.6.2 =
+* Dashboard Canvas: the rendered Beaver Builder layout HTML is cached for 15 minutes in a non-autoloaded option and invalidated when the layout is saved, the Beaver Builder cache is cleared, or the layout assignment changes — the render cost ~950ms and 15 queries on every dashboard load before.
+* Menu Restrictor: the discovered admin menu tree is cached for an hour in a non-autoloaded option instead of bootstrapping the entire wp-admin menu builder (every plugin's admin_menu callbacks) on each settings request. Cleared when plugins or the theme change and when restrictions are saved or imported.
+* Column Sorting: column type discovery for WooCommerce, Gravity Forms, and Pods now runs only when a list screen actually sorts or filters, and the integration maps are cached for an hour in non-autoloaded options. Pods discovery uses a single load_pods() call instead of one query per pod.
+* Column Sorting filters: automatic dropdowns only appear for columns with a known backing store, and their value lists are cached for 15 minutes in non-autoloaded options. Unknown columns on the users screen no longer query the postmeta table.
+* Caches use non-autoloaded options rather than transients, so they survive hosts whose object-cache drop-in has no persistent backend (an inactive LiteSpeed drop-in makes transients per-request).
+* Fixed: sortable columns never registered on custom post type screens — a literal hook name WordPress never fires was being used. Registration is now per screen.
+* New filters: onedog_bbca_canvas_cache, onedog_bbca_canvas_cache_ttl, onedog_bbca_menu_cache_ttl.
 
 = 1.6.1 =
 * Fixed trailing numbers on menu labels in the Menu Restrictor (e.g. "Plugins 0", "Site Health 0") by stripping WordPress update/notification count spans before removing remaining HTML tags.
@@ -183,6 +192,9 @@ All data remains local to your WordPress installation.
 * Automatic migration from legacy plugin on activation.
 
 == Upgrade Notice ==
+
+= 1.6.2 =
+Admin performance release: the dashboard canvas layout and the Menu Restrictor's menu discovery are now cached, and Column Sorting no longer runs integration discovery on every admin page. No settings change is required.
 
 = 1.6.1 =
 Fixes trailing update-count numbers on Menu Restrictor labels, adds LiteSpeed Cache to the hideable menu list, and ensures blocked menus stay hidden when other plugins manipulate the menu late. Recommended for all sites using the Menu Restrictor.

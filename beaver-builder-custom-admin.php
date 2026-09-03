@@ -4,7 +4,7 @@
  * Description: Modular WordPress admin customization — full-bleed dashboard canvas, role/menu/toolbar visibility, notice cleaner, column sorting, and 3rd-party squashing by user role.
  * Author: Ryan Waterbury
  * Author URI: https://onedog.solutions/
- * Version: 1.6.1
+ * Version: 1.6.2
  * Requires at least: 5.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BBCA_VER', '1.6.1' );
+define( 'BBCA_VER', '1.6.2' );
 define( 'BBCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BBCA_URL', plugins_url( '/', __FILE__ ) );
 define( 'BBCA_PATH', plugin_basename( __FILE__ ) );

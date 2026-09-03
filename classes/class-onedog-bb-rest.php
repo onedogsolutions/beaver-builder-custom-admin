@@ -620,7 +620,16 @@ final class OneDog_BB_REST {
 
 		// Import dashboard canvas settings.
 		if ( isset( $config['canvas_layout_id'] ) ) {
-			update_option( 'onedog_bbca_canvas_layout_id', absint( $config['canvas_layout_id'] ) );
+			$previous_layout_id = absint( get_option( 'onedog_bbca_canvas_layout_id', 0 ) );
+			$new_layout_id      = absint( $config['canvas_layout_id'] );
+
+			update_option( 'onedog_bbca_canvas_layout_id', $new_layout_id );
+
+			// Drop a stale cached-render entry left from an earlier
+			// assignment of the imported layout.
+			if ( $new_layout_id !== $previous_layout_id && class_exists( 'OneDog_BBCA_Dashboard_Canvas' ) ) {
+				OneDog_BBCA_Dashboard_Canvas::flush_layout_cache();
+			}
 		}
 		if ( isset( $config['canvas_target_roles'] ) && is_array( $config['canvas_target_roles'] ) ) {
 			update_option( 'onedog_bbca_canvas_target_roles', array_map( 'sanitize_text_field', $config['canvas_target_roles'] ) );
@@ -905,7 +914,17 @@ final class OneDog_BB_REST {
 			return new WP_Error( 'invalid_data', __( 'Settings must be an array.', 'bb-custom-admin' ), [ 'status' => 400 ] );
 		}
 
-		update_option( 'onedog_bbca_canvas_layout_id', absint( $settings['layout_id'] ?? 0 ) );
+		$previous_layout_id = absint( get_option( 'onedog_bbca_canvas_layout_id', 0 ) );
+		$new_layout_id      = absint( $settings['layout_id'] ?? 0 );
+
+		update_option( 'onedog_bbca_canvas_layout_id', $new_layout_id );
+
+		// The cached canvas HTML is keyed per layout, so a stale entry left
+		// from an earlier assignment of the newly selected layout must not
+		// outlive the reassignment.
+		if ( $new_layout_id !== $previous_layout_id && class_exists( 'OneDog_BBCA_Dashboard_Canvas' ) ) {
+			OneDog_BBCA_Dashboard_Canvas::flush_layout_cache();
+		}
 
 		update_option(
 			'onedog_bbca_canvas_target_roles',

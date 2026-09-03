@@ -19,6 +19,13 @@ defined( 'ABSPATH' ) || exit;
 final class OneDog_BBCA_Column_Sorting_Filters {
 
 	/**
+	 * How long filter dropdown value lists stay cached, in seconds.
+	 *
+	 * @var int
+	 */
+	const OPTIONS_CACHE_TTL = 15 * MINUTE_IN_SECONDS;
+
+	/**
 	 * Initializes hooks.
 	 *
 	 * @since 1.4.0
@@ -142,6 +149,10 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 	/**
 	 * Returns the columns that should have filter dropdowns for a screen.
 	 *
+	 * When no columns are explicitly configured, only the known filterable
+	 * set gets dropdowns — see is_auto_filterable_column(). An explicitly
+	 * configured list is the administrator's choice and is honoured as-is.
+	 *
 	 * @since 1.4.0
 	 * @param string $screen_id Screen ID.
 	 * @return array Array of [ key, label ] items.
@@ -161,12 +172,11 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 			$all_columns = OneDog_BBCA_Column_Sorting::discover_columns_for_screen( $screen_obj );
 		}
 
-		// If no filter_columns configured, filter all non-trivial columns.
+		// If no filter_columns configured, filter the known filterable set.
 		if ( empty( $filter_keys ) && ! empty( $all_columns ) ) {
 			$filter_keys = [];
 			foreach ( $all_columns as $key => $label ) {
-				$type = OneDog_BBCA_Column_Sorting::detect_column_type( $key );
-				if ( 'none' !== $type['type'] && 'comment' !== $key ) {
+				if ( self::is_auto_filterable_column( $key, $screen_id ) ) {
 					$filter_keys[] = $key;
 				}
 			}
@@ -192,6 +202,52 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 	}
 
 	/**
+	 * Checks whether a column should get an automatic filter dropdown.
+	 *
+	 * Auto dropdowns are limited to columns whose storage is understood:
+	 * core fields with a meaningful value set (status, author, role),
+	 * taxonomy columns, and meta columns mapped by the type map or an
+	 * integration. Unknown columns are usually custom renderers — an icon,
+	 * a computed total — and a dropdown for them would query for a meta key
+	 * that may not exist, on a table chosen by guesswork.
+	 *
+	 * @since 1.6.2
+	 * @param string $key       Column key.
+	 * @param string $screen_id Screen ID.
+	 * @return bool
+	 */
+	private static function is_auto_filterable_column( $key, $screen_id ) {
+		if ( ! OneDog_BBCA_Column_Sorting::is_known_column_type( $key ) ) {
+			return false;
+		}
+
+		$type           = OneDog_BBCA_Column_Sorting::detect_column_type( $key );
+		$is_user_screen = ( 'users' === $screen_id );
+
+		switch ( $type['type'] ) {
+			case 'taxonomy':
+				return ! $is_user_screen;
+
+			case 'post_field':
+				return ! $is_user_screen
+					&& in_array( $type['orderby'] ?? '', [ 'post_status', 'author' ], true );
+
+			case 'post_meta':
+			case 'meta':
+				return ! $is_user_screen;
+
+			case 'user_field':
+				return $is_user_screen
+					&& in_array( $type['orderby'] ?? '', [ 'role', 'capabilities' ], true );
+
+			case 'user_meta':
+				return $is_user_screen;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Renders a single filter dropdown.
 	 *
 	 * @since 1.4.0
@@ -207,8 +263,7 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 			: '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		$options = self::get_filter_options( $column_key, $screen_id );
-		$type    = OneDog_BBCA_Column_Sorting::detect_column_type( $column_key );
+		$type = OneDog_BBCA_Column_Sorting::detect_column_type( $column_key );
 
 		// For taxonomy columns, use WordPress's native taxonomy filter if available.
 		if ( 'taxonomy' === $type['type'] && taxonomy_exists( $type['taxonomy'] ?? '' ) ) {
@@ -230,6 +285,8 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 				return;
 			}
 		}
+
+		$options = self::get_filter_options( $column_key, $screen_id );
 
 		$is_active = '' !== $current_value;
 		$css_class = 'bbca-filter-select' . ( $is_active ? ' bbca-filter-active' : '' );
@@ -259,46 +316,64 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 	/**
 	 * Returns filter options (distinct values) for a given column.
 	 *
+	 * Meta columns resolve against the table the screen implies — user
+	 * columns against usermeta, comment columns against commentmeta —
+	 * rather than always postmeta.
+	 *
 	 * @since 1.4.0
 	 * @param string $column_key Column key.
 	 * @param string $screen_id  Screen ID.
 	 * @return array value => label pairs.
 	 */
 	private static function get_filter_options( $column_key, $screen_id ) {
-		global $wpdb;
-
 		$type = OneDog_BBCA_Column_Sorting::detect_column_type( $column_key );
-		$options = [];
 
 		switch ( $type['type'] ) {
 			case 'post_field':
-				$options = self::get_post_field_options( $type['orderby'] ?? $column_key );
-				break;
+				return self::get_post_field_options( $type['orderby'] ?? $column_key );
 
 			case 'taxonomy':
-				$options = self::get_taxonomy_options( $type['taxonomy'] ?? '' );
-				break;
+				return self::get_taxonomy_options( $type['taxonomy'] ?? '' );
+
+			case 'user_field':
+				return self::get_user_field_options( $type['orderby'] ?? $column_key );
+
+			case 'user_meta':
+				// The role column's meta key stores serialized capability
+				// arrays; the role list itself is the useful value set.
+				$meta_key = $type['meta_key'] ?? $column_key;
+				if ( false !== strpos( $meta_key, 'capabilities' ) ) {
+					return self::get_user_field_options( 'role' );
+				}
+				return self::get_meta_options( $meta_key, 'user' );
 
 			case 'meta':
 			case 'post_meta':
-				$options = self::get_meta_options( $type['meta_key'] ?? $column_key, 'post' );
-				break;
-
-			case 'user_field':
-				$options = self::get_user_field_options( $type['orderby'] ?? $column_key );
-				break;
-
-			case 'user_meta':
-				$options = self::get_meta_options( $type['meta_key'] ?? $column_key, 'user' );
-				break;
-
 			default:
-				// Attempt to get meta options as fallback.
-				$options = self::get_meta_options( $column_key, 'post' );
-				break;
+				return self::get_meta_options(
+					$type['meta_key'] ?? $column_key,
+					self::meta_context_for_screen( $screen_id )
+				);
+		}
+	}
+
+	/**
+	 * Returns the meta table context implied by a screen.
+	 *
+	 * @since 1.6.2
+	 * @param string $screen_id Screen ID.
+	 * @return string 'post', 'user', or 'comment'.
+	 */
+	private static function meta_context_for_screen( $screen_id ) {
+		if ( 'users' === $screen_id ) {
+			return 'user';
 		}
 
-		return $options;
+		if ( 'edit-comments' === $screen_id ) {
+			return 'comment';
+		}
+
+		return 'post';
 	}
 
 	/**
@@ -370,9 +445,13 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 	/**
 	 * Gets distinct meta values for a given meta key.
 	 *
+	 * Results are cached in a non-autoloaded option: the DISTINCT + ORDER BY
+	 * query runs on every list screen render otherwise, and the value set is
+	 * slow-moving enough that a short TTL is fine.
+	 *
 	 * @since 1.4.0
 	 * @param string $meta_key Meta key.
-	 * @param string $context  'post' or 'user'.
+	 * @param string $context  'post', 'user', or 'comment'.
 	 * @return array
 	 */
 	private static function get_meta_options( $meta_key, $context = 'post' ) {
@@ -384,28 +463,32 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 			return [];
 		}
 
+		$cache_key = 'onedog_bbca_filter_opts_' . md5( $context . '|' . $meta_key );
+		$cached    = get_option( $cache_key );
+
+		if ( is_array( $cached ) && is_array( $cached['opts'] ?? null )
+			&& (int) ( $cached['ts'] ?? 0 ) + self::OPTIONS_CACHE_TTL > time() ) {
+			return $cached['opts'];
+		}
+
 		if ( 'user' === $context ) {
-			$table     = $wpdb->usermeta;
-			$value_col = 'meta_value';
+			$table = $wpdb->usermeta;
+		} elseif ( 'comment' === $context ) {
+			$table = $wpdb->commentmeta;
 		} else {
-			$table     = $wpdb->postmeta;
-			$value_col = 'meta_value';
+			$table = $wpdb->postmeta;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$results = $wpdb->get_col(
 			$wpdb->prepare(
-				"SELECT DISTINCT {$value_col} FROM {$table} WHERE meta_key = %s AND meta_value != '' ORDER BY meta_value ASC LIMIT 200", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT DISTINCT meta_value FROM {$table} WHERE meta_key = %s AND meta_value != '' ORDER BY meta_value ASC LIMIT 200", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$meta_key
 			)
 		);
 
-		if ( empty( $results ) ) {
-			return [];
-		}
-
 		$options = [];
-		foreach ( $results as $value ) {
+		foreach ( (array) $results as $value ) {
 			// Skip serialized arrays/objects (not useful for filtering).
 			if ( is_serialized( $value ) ) {
 				continue;
@@ -413,6 +496,17 @@ final class OneDog_BBCA_Column_Sorting_Filters {
 
 			$display = mb_strlen( $value ) > 40 ? mb_substr( $value, 0, 40 ) . '…' : $value;
 			$options[ $value ] = $display;
+		}
+
+		$value = [
+			'ts'   => time(),
+			'opts' => $options,
+		];
+
+		// add_option() first so the row is created with autoload off; the
+		// update path leaves the existing autoload flag untouched.
+		if ( ! add_option( $cache_key, $value, '', false ) ) {
+			update_option( $cache_key, $value );
 		}
 
 		return $options;

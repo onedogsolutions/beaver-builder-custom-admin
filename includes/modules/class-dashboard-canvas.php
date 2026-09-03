@@ -32,6 +32,19 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	const LAYOUT_OPTION = 'onedog_bbca_canvas_layout_id';
 
 	/**
+	 * Option key for the cached rendered layout HTML.
+	 *
+	 * Stored as a non-autoloaded option rather than a transient: hosts can
+	 * run an object-cache drop-in without a persistent backend (an inactive
+	 * LiteSpeed drop-in is the known case), which silently makes transients
+	 * per-request. Options persist regardless of the object cache state.
+	 *
+	 * @since 1.6.2
+	 * @var string
+	 */
+	const LAYOUT_CACHE_KEY = 'onedog_bbca_canvas_cache';
+
+	/**
 	 * Option key for roles subject to canvas replacement and squashing.
 	 *
 	 * @var string
@@ -114,6 +127,16 @@ final class OneDog_BBCA_Dashboard_Canvas {
 		// front-end render of the same layout can be compared directly.
 		add_action( 'admin_print_footer_scripts', [ __CLASS__, 'maybe_debug_styles' ], 9999 );
 		add_action( 'wp_footer', [ __CLASS__, 'maybe_debug_styles' ], 9999 );
+
+		// Invalidate the cached canvas HTML when its layout changes. Beaver
+		// Builder saves layouts through its own AJAX endpoints as well as the
+		// normal post save, and fl_builder_cache_cleared() fires with no
+		// arguments, so the callback treats a missing post ID as "the
+		// assigned layout".
+		add_action( 'save_post', [ __CLASS__, 'flush_layout_cache' ] );
+		add_action( 'fl_builder_after_save_layout', [ __CLASS__, 'flush_layout_cache' ] );
+		add_action( 'fl_builder_after_save_draft', [ __CLASS__, 'flush_layout_cache' ] );
+		add_action( 'fl_builder_cache_cleared', [ __CLASS__, 'flush_layout_cache' ] );
 	}
 
 	/*
@@ -195,6 +218,7 @@ final class OneDog_BBCA_Dashboard_Canvas {
 	 *
 	 * Uses FLBuilderShortcode::insert() when available (handles asset
 	 * loading internally), falling back to do_shortcode() otherwise.
+	 * The inner layout HTML is served from cache — see get_layout_html().
 	 *
 	 * @since 1.3.0
 	 * @return void
@@ -213,13 +237,163 @@ final class OneDog_BBCA_Dashboard_Canvas {
 
 		echo '<div id="bbca-custom-dashboard-canvas">';
 
+		echo self::get_layout_html( $layout_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
+		echo '</div>';
+	}
+
+	/**
+	 * Returns the rendered layout HTML, cached across requests.
+	 *
+	 * Rendering a layout measured ~950ms and 15 queries on the reference
+	 * site, and the dashboard runs it for every targeted role on every
+	 * load. The markup only changes when the layout post or the builder
+	 * cache changes, both of which invalidate the cache, so the TTL is a
+	 * safety net rather than the primary invalidation path.
+	 *
+	 * Output buffering captures everything the render emits: a module
+	 * that echoes instead of returning would otherwise escape the cache.
+	 *
+	 * @since 1.6.2
+	 * @param int $layout_id Post ID of the Beaver Builder layout.
+	 * @return string
+	 */
+	private static function get_layout_html( $layout_id ) {
+		$ttl = self::layout_cache_ttl();
+
+		if ( $ttl > 0 ) {
+			$cached = self::read_layout_cache( $layout_id );
+			if ( null !== $cached ) {
+				return $cached;
+			}
+		}
+
+		ob_start();
+
 		if ( class_exists( 'FLBuilderShortcode' ) && method_exists( 'FLBuilderShortcode', 'insert' ) ) {
 			echo FLBuilderShortcode::insert( [ 'id' => $layout_id ] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		} else {
 			echo do_shortcode( '[fl_builder_insert_layout id="' . esc_attr( $layout_id ) . '"]' );
 		}
 
-		echo '</div>';
+		$html = (string) ob_get_clean();
+
+		// An empty render is treated as a miss: caching it would pin a
+		// blank dashboard for the full TTL after a single failed render.
+		if ( $ttl > 0 && '' !== $html ) {
+			self::write_layout_cache( $layout_id, $html );
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Returns a fresh cache entry for a layout, or null on any miss.
+	 *
+	 * A single non-autoloaded option holds the cache, so switching the
+	 * assigned layout cannot orphan rows: a stale entry simply fails the
+	 * layout match below.
+	 *
+	 * @since 1.6.2
+	 * @param int $layout_id Post ID of the Beaver Builder layout.
+	 * @return string|null
+	 */
+	private static function read_layout_cache( $layout_id ) {
+		$cached = get_option( self::LAYOUT_CACHE_KEY );
+
+		if ( ! is_array( $cached ) || (int) ( $cached['layout_id'] ?? 0 ) !== (int) $layout_id ) {
+			return null;
+		}
+
+		if ( (int) ( $cached['ts'] ?? 0 ) + self::layout_cache_ttl() <= time() ) {
+			return null;
+		}
+
+		$html = $cached['html'] ?? '';
+
+		return ( is_string( $html ) && '' !== $html ) ? $html : null;
+	}
+
+	/**
+	 * Stores the rendered layout HTML as a non-autoloaded option.
+	 *
+	 * @since 1.6.2
+	 * @param int    $layout_id Post ID of the Beaver Builder layout.
+	 * @param string $html      Rendered layout markup.
+	 * @return void
+	 */
+	private static function write_layout_cache( $layout_id, $html ) {
+		$value = [
+			'layout_id' => (int) $layout_id,
+			'ts'        => time(),
+			'html'      => $html,
+		];
+
+		// add_option() first so the row is created with autoload off; the
+		// update path leaves the existing autoload flag untouched.
+		if ( ! add_option( self::LAYOUT_CACHE_KEY, $value, '', false ) ) {
+			update_option( self::LAYOUT_CACHE_KEY, $value );
+		}
+	}
+
+	/**
+	 * Returns the TTL for the cached canvas HTML, in seconds.
+	 *
+	 * @since 1.6.2
+	 * @return int Zero disables the cache.
+	 */
+	private static function layout_cache_ttl() {
+		/**
+		 * Filters whether the rendered dashboard canvas HTML is cached.
+		 *
+		 * Returning false disables caching and serves a fresh render on
+		 * every dashboard load.
+		 *
+		 * @since 1.6.2
+		 *
+		 * @param bool $cache Whether to cache the rendered layout HTML.
+		 */
+		if ( ! apply_filters( 'onedog_bbca_canvas_cache', true ) ) {
+			return 0;
+		}
+
+		/**
+		 * Filters how long the rendered dashboard canvas HTML stays cached.
+		 *
+		 * @since 1.6.2
+		 *
+		 * @param int $ttl Cache lifetime in seconds. 0 disables caching.
+		 */
+		return (int) apply_filters( 'onedog_bbca_canvas_cache_ttl', 15 * MINUTE_IN_SECONDS );
+	}
+
+	/**
+	 * Deletes the cached HTML for the assigned layout.
+	 *
+	 * Doubles as the invalidation callback for `save_post` and Beaver
+	 * Builder's save/clear actions, which all pass the post ID first;
+	 * `fl_builder_cache_cleared()` passes nothing, and a zero post ID
+	 * flushes the assigned layout unconditionally.
+	 *
+	 * @since 1.6.2
+	 * @param int $post_id Post ID of the layout that changed.
+	 * @return void
+	 */
+	public static function flush_layout_cache( $post_id = 0 ) {
+		$post_id   = absint( $post_id );
+		$layout_id = absint( get_option( self::LAYOUT_OPTION, 0 ) );
+
+		if ( ! $layout_id ) {
+			return;
+		}
+
+		// A post-scoped flush only applies when the saved post is the
+		// assigned layout.
+		if ( $post_id && $post_id !== $layout_id ) {
+			return;
+		}
+
+		delete_option( self::LAYOUT_CACHE_KEY );
 	}
 
 	/*
